@@ -52,11 +52,11 @@
   <script>
     const redirectUrl = @json($redirectUrl);
 
-    // setTimeout(() => {
-    //   if (redirectUrl) {
-    //     window.location.href = redirectUrl;
-    //   }
-    // }, 5000);
+    setTimeout(() => {
+       if (redirectUrl) {
+         window.location.href = redirectUrl;
+       }
+    }, 5000);
   </script>
 </body>
 </html>
