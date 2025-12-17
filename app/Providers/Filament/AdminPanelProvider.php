@@ -41,7 +41,7 @@ class AdminPanelProvider extends PanelProvider
             ->widgets([
                 \App\Filament\Widgets\StatsOverview::class,
                 \App\Filament\Widgets\StoreRanking::class,
-                \App\Filament\Widgets\StoreCycle::class,
+                // \App\Filament\Widgets\StoreCycle::class,
             ])
             ->middleware([
                 EncryptCookies::class,
