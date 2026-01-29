@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>{{ $store->name }} | クーポン一覧</title>
+  <title>クーポン一覧</title>
   <style>
     body{margin:0;background:#0b0b0f;color:#fff;font-family:system-ui,-apple-system,BlinkMacSystemFont}
     .wrap{max-width:720px;margin:0 auto;padding:18px 14px 28px}
@@ -45,7 +45,7 @@
   <div class="wrap">
     <div class="top">
       <div>
-        <h1 class="h1">{{ $store->name }} クーポン一覧</h1>
+        <h1 class="h1">クーポン一覧</h1>
         <div class="sub">u={{ $lineUserId }} / store={{ $storeId }}</div>
       </div>
       <div class="pill">{{ count($coupons) }}件</div>
@@ -53,25 +53,29 @@
 
     <div class="grid">
       @foreach($coupons as $c)
-        <a class="card" href="/coupons/{{ $c['id'] }}?store={{ $storeId }}&u={{ urlencode($lineUserId) }}">
-          <img class="img" src="{{ $c['image_url'] }}" alt="coupon">
+        <a class="card" href="{{ route('coupons.show', ['userCouponId' => $c->user_coupon_id, 'store' => $storeId, 'u' => $lineUserId]) }}">
+          <img class="img" src="{{ $c->image_url ?? 'https://placehold.co/900x300/png?text=COUPON' }}" alt="coupon">
           <div class="body">
             <div class="row">
-              <div class="title">{{ $c['title'] }}</div>
-              <span class="badge {{ $c['status'] }}">{{ $c['status'] === 'unused' ? '未使用' : ($c['status'] === 'used' ? '使用済み' : '期限切れ') }}</span>
+              <div class="title">{{ $c->title }}</div>
+              @php
+                $status = $c->status;
+                $label = $status === 'issued' ? '未使用' : ($status === 'used' ? '使用済み' : '期限切れ');
+                $cls = $status === 'issued' ? 'unused' : ($status === 'used' ? 'used' : 'expired');
+              @endphp
+              <span class="badge {{ $cls }}">{{ $label }}</span>
             </div>
-            <div class="note">{{ $c['note'] }}</div>
+            <div class="note">{{ $c->note ?? '' }}</div>
             <div class="meta">
-              <span class="badge">種別：{{ $c['type'] }}</span>
-              <span class="badge">期限：{{ $c['expires_at'] }}</span>
+              <span class="badge">種別：{{ $c->type }}</span>
+              <span class="badge">期限：{{ $c->expires_at ? \Carbon\Carbon::parse($c->expires_at)->format('Y/m/d') : '—' }}</span>
+              @if($c->used_at)
+                <span class="badge">使用：{{ \Carbon\Carbon::parse($c->used_at)->format('Y/m/d H:i') }}</span>
+              @endif
             </div>
           </div>
         </a>
       @endforeach
-    </div>
-
-    <div class="footer">
-      ※ いまはUXモック（DB未接続）。次に user_coupons テーブルに置換します。
     </div>
   </div>
 </body>

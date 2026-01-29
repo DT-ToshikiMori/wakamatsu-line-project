@@ -80,7 +80,7 @@
   <div class="top">
     <div>
       <h1 class="h1">クーポン詳細</h1>
-      <div class="sub">store={{ $storeId }} / u={{ $lineUserId }} / id={{ $coupon['id'] }}</div>
+      <div class="sub">store={{ $storeId }} / u={{ $lineUserId }} / id={{ $coupon->user_coupon_id }}</div>
     </div>
     <div class="pill">{{ $isUsed ? '使用済み' : '未使用' }}</div>
   </div>
@@ -88,21 +88,21 @@
   <div class="stage">
     <div id="rotateWrap" class="rotateWrap">
       <div class="card">
-        <img class="img" src="{{ $coupon['image_url'] }}" alt="coupon">
+        <img class="img" src="{{ $coupon->image_url ?? 'https://placehold.co/900x300/png?text=COUPON' }}" alt="coupon">
         <div class="body">
           <div class="row">
-            <div class="title">{{ $coupon['title'] }}</div>
-            <span class="badge">{{ $coupon['type'] }}</span>
+            <div class="title">{{ $coupon->title }}</div>
+            <span class="badge">{{ $coupon->type }}</span>
           </div>
-          <div class="note">{{ $coupon['note'] }}</div>
+          <div class="note">{{ $coupon->note ?? '' }}</div>
           <div class="meta">
-            <span class="badge">期限：{{ $coupon['expires_at'] }}</span>
+            <span class="badge">期限：{{ $coupon->expires_at ? \Carbon\Carbon::parse($coupon->expires_at)->format('Y/m/d') : '—' }}</span>
           </div>
 
           @if(!$isUsed)
             <div class="btnRow">
               <button class="btn" id="useBtn" type="button">使用する（レジで提示）</button>
-              <a class="btn secondary" href="/coupons?store={{ $storeId }}&u={{ urlencode($lineUserId) }}">一覧に戻る</a>
+              <a class="btn secondary" href="{{ route('coupons.index', ['store' => (int)$storeId, 'u' => $lineUserId]) }}">一覧に戻る</a>
             </div>
 
             <div class="verifyBox hidden" id="verifyBox">
@@ -113,9 +113,16 @@
               </div>
             </div>
           @else
-            <div class="used">✅ 使用済みです</div>
+            <div class="used">
+              ✅ 使用済みです
+              @if(!empty($usedAt))
+                <span style="opacity:.7;font-weight:600;margin-left:6px;">
+                  ({{ \Carbon\Carbon::parse($usedAt)->format('Y/m/d H:i') }})
+                </span>
+              @endif
+            </div>
             <div class="btnRow">
-              <a class="btn secondary" href="/coupons?store={{ $storeId }}&u={{ urlencode($lineUserId) }}">一覧に戻る</a>
+              <a class="btn secondary" href="{{ route('coupons.index', ['store' => (int)$storeId, 'u' => $lineUserId]) }}">一覧に戻る</a>
             </div>
           @endif
 
@@ -152,7 +159,7 @@
     confirmBtn.addEventListener('click', async () => {
       if (!confirm('このクーポンを使用済みにします。よろしいですか？')) return;
 
-      const res = await fetch(`/coupons/{{ $coupon['id'] }}/use`, {
+      const res = await fetch(`{{ route('coupons.use', ['userCouponId' => $coupon->user_coupon_id]) }}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
