@@ -18,6 +18,7 @@ return new class extends Migration
             $table->timestamp('first_visit_at')->nullable();
             $table->timestamp('last_visit_at')->nullable();
             $table->unsignedInteger('visit_count')->default(0);
+            $table->unsignedInteger('stamp_count')->default(0); // ← これを追加
             $table->timestamps();
 
             $table->unique(['store_id', 'line_user_id']);
