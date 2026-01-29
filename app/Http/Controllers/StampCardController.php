@@ -25,7 +25,6 @@ class StampCardController extends Controller
                 'first_visit_at' => null,
                 'last_visit_at' => null,
                 'visit_count' => 0,
-                'stamp_count' => 0, // 互換用（将来消すなら後で）
                 'stamp_total' => 0,
                 'current_card_id' => null,
                 'card_progress' => 0,
@@ -301,7 +300,6 @@ class StampCardController extends Controller
                 'first_visit_at' => null,
                 'last_visit_at' => null,
                 'visit_count' => 0,
-                'stamp_count' => 0,
                 'stamp_total' => 0,
                 'current_card_id' => null,
                 'card_progress' => 0,
