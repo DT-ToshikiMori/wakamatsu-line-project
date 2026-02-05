@@ -38,9 +38,16 @@ class AdminPanelProvider extends PanelProvider
                 Pages\Dashboard::class,
             ])
             ->widgets([
-                \App\Filament\Widgets\StatsOverview::class,
+                // 来店サマリー
+                \App\Filament\Widgets\KpiOverview::class,
+                \App\Filament\Widgets\VisitsTrend::class,
+
+                // クーポン状況（今月）
+                \App\Filament\Widgets\CouponKpi::class,
+                \App\Filament\Widgets\CouponTemplateRanking::class,
+
+                // 店舗サマリー
                 \App\Filament\Widgets\StoreRanking::class,
-                // \App\Filament\Widgets\StoreCycle::class,
             ])
             ->middleware([
                 EncryptCookies::class,

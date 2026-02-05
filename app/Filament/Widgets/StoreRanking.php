@@ -2,31 +2,33 @@
 
 namespace App\Filament\Widgets;
 
-use Filament\Tables;
-use Filament\Tables\Table;
-use Filament\Widgets\TableWidget as BaseWidget;
-use App\Models\Visit;
+use Filament\Widgets\Widget;
+use Illuminate\Support\Facades\DB;
 
-class StoreRanking extends BaseWidget
+class StoreRanking extends Widget
 {
-    protected static ?int $sort = 2;
-    protected int|string|array $columnSpan = 'full';
+    
+    protected static string $view = 'filament.widgets.store-ranking';
 
-    public function table(Table $table): Table
+    protected function getHeading(): ?string
     {
-        // ✅ DB::table じゃなくて Visit::query()（Eloquent）で作る
-        $query = \App\Models\Visit::query()
-            ->join('stores', 'stores.id', '=', 'visits.store_id')
-            ->selectRaw('stores.id as id, stores.name as store_name, COUNT(*) as visit_count')
-            ->groupBy('stores.id', 'stores.name')
-            ->orderByDesc('visit_count');
+        return '店舗サマリー';
+    }
 
-        return $table
-            ->query($query)
-            ->columns([
-                Tables\Columns\TextColumn::make('store_name')->label('店舗'),
-                Tables\Columns\TextColumn::make('visit_count')->label('来店数')->sortable(),
-            ])
-            ->paginated(false);
+    protected function getViewData(): array
+    {
+        $monthStart = now()->startOfMonth();
+        $monthEnd   = now()->endOfMonth();
+
+        $rows = DB::table('visits as v')
+            ->join('stores as s', 's.id', '=', 'v.store_id')
+            ->whereBetween('v.visited_at', [$monthStart, $monthEnd])
+            ->groupBy('s.id', 's.name')
+            ->select('s.name as store_name', DB::raw('COUNT(*) as visits'))
+            ->orderByDesc('visits')
+            ->limit(5)
+            ->get();
+
+        return ['rows' => $rows];
     }
 }
