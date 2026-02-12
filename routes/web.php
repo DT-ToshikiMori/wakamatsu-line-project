@@ -8,6 +8,11 @@ use App\Http\Controllers\CouponController;
 use App\Http\Controllers\LiffController;
 use App\Http\Controllers\LineWebhookController;
 
+// ルート: LINEログイン後のOAuthコールバック先（liff.stateでパスに飛ぶ）
+Route::get('/', function () {
+    return response()->view('liff-auth');
+});
+
 // LIFF初期化API（認証前に呼ばれるのでミドルウェア不要）
 Route::post('/api/liff/init', [LiffController::class, 'init']);
 
