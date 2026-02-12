@@ -16,7 +16,9 @@ class CouponController extends Controller
         abort_if($storeId <= 0, 400, 'store is required');
 
         $lineUserId = $req->attributes->get('line_user_id');
-        abort_if(!$lineUserId, 401, 'LIFF認証が必要です');
+        if (!$lineUserId) {
+            return response()->view('liff-auth');
+        }
 
         $user = DB::table('users')
             ->where('store_id', $storeId)
@@ -58,7 +60,9 @@ class CouponController extends Controller
         abort_if($storeId <= 0, 400, 'store is required');
 
         $lineUserId = $req->attributes->get('line_user_id');
-        abort_if(!$lineUserId, 401, 'LIFF認証が必要です');
+        if (!$lineUserId) {
+            return response()->view('liff-auth');
+        }
 
         $user = DB::table('users')
             ->where('store_id', $storeId)

@@ -12,7 +12,11 @@ class StampCardController extends Controller
     public function card(Request $req, int $store)
     {
         $lineUserId = $req->attributes->get('line_user_id');
-        abort_if(!$lineUserId, 401, 'LIFF認証が必要です');
+
+        // 未認証 → LIFF認証ページを表示（LIFF SDK初期化→セッション確立→リロード）
+        if (!$lineUserId) {
+            return response()->view('liff-auth');
+        }
 
         $displayName = $req->attributes->get('line_display_name');
         $picture = $req->attributes->get('line_picture');
