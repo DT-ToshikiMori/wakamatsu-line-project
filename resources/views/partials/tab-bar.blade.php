@@ -1,6 +1,7 @@
 <style>
-  html,body{
-    background:#0b0b0f;
+  html{
+    background:#101014;
+    min-height:100%;
   }
   .tabBar{
     position:fixed;
@@ -10,6 +11,15 @@
     border-top:1px solid rgba(255,255,255,.10);
     z-index:50;
     padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+  /* 万が一safe-areaが効かない環境用に下に余白を確保 */
+  .tabBar::after{
+    content:'';
+    position:absolute;
+    left:0;right:0;
+    top:100%;
+    height:80px;
+    background:#101014;
   }
   .tabBar a{
     flex:1;
