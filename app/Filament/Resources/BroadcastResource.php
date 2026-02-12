@@ -158,6 +158,9 @@ class BroadcastResource extends Resource
                             'status' => 'scheduled',
                             'scheduled_at' => now(),
                         ]);
+
+                        // 即時実行
+                        \Illuminate\Support\Facades\Artisan::call('messages:process-broadcasts');
                     }),
             ])
             ->bulkActions([
