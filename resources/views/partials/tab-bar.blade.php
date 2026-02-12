@@ -1,9 +1,12 @@
 <style>
+  html,body{
+    background:#0b0b0f;
+  }
   .tabBar{
     position:fixed;
     bottom:0;left:0;right:0;
     display:flex;
-    background:rgba(16,16,20,.96);
+    background:#101014;
     border-top:1px solid rgba(255,255,255,.10);
     z-index:50;
     padding-bottom: env(safe-area-inset-bottom, 0);
