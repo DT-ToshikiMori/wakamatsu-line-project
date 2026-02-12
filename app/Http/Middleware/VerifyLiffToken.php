@@ -27,13 +27,23 @@ class VerifyLiffToken
         $idToken = $request->bearerToken();
 
         if (!$idToken) {
-            return response()->json(['error' => 'LIFF認証が必要です。LINEアプリからアクセスしてください。'], 401);
+            // POST/JSONリクエストは401で拒否
+            if ($request->expectsJson() || $request->isMethod('POST')) {
+                return response()->json(['error' => 'LIFF認証が必要です。'], 401);
+            }
+
+            // ブラウザGETリクエスト → LIFF認証ページを表示
+            // LIFF SDKが初期化→認証→セッション確立→リロードの流れを処理
+            return response()->view('liff-auth');
         }
 
         $profile = $this->liffTokenService->verify($idToken);
 
         if (!$profile) {
-            return response()->json(['error' => 'IDトークンの検証に失敗しました。'], 401);
+            if ($request->expectsJson() || $request->isMethod('POST')) {
+                return response()->json(['error' => 'IDトークンの検証に失敗しました。'], 401);
+            }
+            return response()->view('liff-auth');
         }
 
         // セッションに保存
