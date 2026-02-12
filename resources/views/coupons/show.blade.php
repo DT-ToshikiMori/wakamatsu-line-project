@@ -102,7 +102,7 @@
           @if(!$isUsed)
             <div class="btnRow">
               <button class="btn" id="useBtn" type="button">使用する（レジで提示）</button>
-              <a class="btn secondary" href="{{ route('coupons.index', ['store' => (int)$storeId]) }}">一覧に戻る</a>
+              <a class="btn secondary" href="/coupons?store={{ (int)$storeId }}">一覧に戻る</a>
             </div>
 
             <div class="verifyBox hidden" id="verifyBox">
@@ -122,7 +122,7 @@
               @endif
             </div>
             <div class="btnRow">
-              <a class="btn secondary" href="{{ route('coupons.index', ['store' => (int)$storeId]) }}">一覧に戻る</a>
+              <a class="btn secondary" href="/coupons?store={{ (int)$storeId }}">一覧に戻る</a>
             </div>
           @endif
 
@@ -132,6 +132,7 @@
   </div>
 </div>
 
+@include('partials.tab-bar', ['tabStoreId' => (int)$storeId, 'tabActive' => 'coupons'])
 @include('partials.liff-init')
 <script>
   const wrap = document.getElementById('rotateWrap');
@@ -158,7 +159,7 @@
     confirmBtn.addEventListener('click', async () => {
       if (!confirm('このクーポンを使用済みにします。よろしいですか？')) return;
 
-      const res = await fetch(`{{ route('coupons.use', ['userCouponId' => $coupon->user_coupon_id]) }}`, {
+      const res = await fetch(`/coupons/{{ $coupon->user_coupon_id }}/use`, {
         method: 'POST',
         headers: liffHeaders(),
         body: JSON.stringify({

@@ -382,11 +382,7 @@
     </div>
 
     <button class="btn" id="checkinBtn" type="button">チェックイン（スタンプ+1）</button>
-    <div class="navLink">
-      <a href="/coupons?store={{ (int)$store->id }}">
-        クーポンを見る
-      </a>
-    </div>
+    <button class="btn secondary" id="clearBtn" type="button" style="font-size:12px;padding:10px 14px;margin-top:8px;">スタンプをクリア（テスト用）</button>
   </div>
 </div>
 
@@ -409,6 +405,7 @@
   </div>
 </div>
 
+@include('partials.tab-bar', ['tabStoreId' => (int)$store->id, 'tabActive' => 'card'])
 @include('partials.liff-init')
 <script>
   const storeId = {{ (int)$store->id }};
@@ -537,6 +534,32 @@
       window.location.reload();
     }
   });
+
+  // クリアボタン
+  const clearBtn = document.getElementById('clearBtn');
+  if (clearBtn) {
+    clearBtn.addEventListener('click', async () => {
+      if (!confirm('スタンプと来店回数をすべてリセットします。よろしいですか？')) return;
+      clearBtn.disabled = true;
+      try {
+        const res = await fetch(`/s/${storeId}/clear`, {
+          method: 'POST',
+          headers: liffHeaders(),
+        });
+        const data = await res.json();
+        if (data.ok) {
+          window.location.reload();
+        } else {
+          alert('クリアに失敗しました');
+        }
+      } catch (e) {
+        alert('クリアに失敗しました');
+        console.error(e);
+      } finally {
+        clearBtn.disabled = false;
+      }
+    });
+  }
 </script>
 </body>
 </html>
