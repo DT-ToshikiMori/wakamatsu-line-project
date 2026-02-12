@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\LineBotService;
+use App\Services\LotteryService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -151,8 +152,10 @@ class StampCardController extends Controller
         $upgradedToCardId = null;
         $upgradedToDisplayName = null;
         $issuedCoupon = null;
+        $lotteryResult = null;
+        $currentCardBeforeUpgrade = null;
 
-        DB::transaction(function () use ($store, $user, $visitedAt, $requestId, &$upgraded, &$upgradedToCardId, &$upgradedToDisplayName) {
+        DB::transaction(function () use ($store, $user, $visitedAt, $requestId, &$upgraded, &$upgradedToCardId, &$upgradedToDisplayName, &$currentCardBeforeUpgrade) {
 
             // ① visit log
             DB::table('visits')->insert([
@@ -185,6 +188,7 @@ class StampCardController extends Controller
             }
 
             $currentCard = $cards->firstWhere('id', $user->current_card_id);
+            $currentCardBeforeUpgrade = $currentCard;
 
             $nextStampTotal = ($user->stamp_total ?? 0) + 1;
             $nextProgress = ($user->card_progress ?? 0) + 1;
@@ -233,71 +237,99 @@ class StampCardController extends Controller
         // ⑥ 再取得
         $newUser = DB::table('users')->where('id', $user->id)->first();
 
-        // Issue rank-up coupon if upgraded
-        if ($upgraded && $upgradedToCardId) {
-            $tpl = DB::table('coupon_templates')
-                ->where('store_id', $store)
-                ->where('type', 'rank_up')
-                ->where('rank_card_id', $upgradedToCardId)
-                ->where('is_active', true)
-                ->orderByDesc('id')
-                ->first();
-
-            if ($tpl) {
-                $userCouponId = DB::table('user_coupons')->insertGetId([
-                    'store_id' => $store,
-                    'user_id' => $user->id,
-                    'coupon_template_id' => $tpl->id,
-                    'status' => 'issued',
-                    'issued_at' => now(),
-                    'used_at' => null,
-                    'expires_at' => null,
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
-
-                if (DB::getSchemaBuilder()->hasTable('coupon_events')) {
-                    DB::table('coupon_events')->insert([
-                        'user_coupon_id' => $userCouponId,
-                        'event' => 'issued',
-                        'actor' => 'system',
-                        'created_at' => now(),
-                    ]);
-                }
-
-                $issuedCoupon = [
-                    'user_coupon_id' => $userCouponId,
-                    'title' => $tpl->title,
-                    'note' => $tpl->note,
-                    'image_url' => $tpl->image_url,
-                ];
-
-                // プッシュ通知：クーポン発行
-                try {
-                    app(LineBotService::class)->pushText(
-                        $lineUserId,
-                        "🎉 {$upgradedToDisplayName}にランクアップしました！クーポン「{$tpl->title}」が発行されました。"
-                    );
-                } catch (\Throwable $e) {
-                    \Illuminate\Support\Facades\Log::warning('Push notification failed', ['error' => $e->getMessage()]);
-                }
-            }
-
-            // プッシュ通知：ランクアップ（クーポンがない場合でも）
-            if (!$tpl) {
-                try {
-                    app(LineBotService::class)->pushText(
-                        $lineUserId,
-                        "🎉 {$upgradedToDisplayName}にランクアップしました！おめでとうございます！"
-                    );
-                } catch (\Throwable $e) {
-                    \Illuminate\Support\Facades\Log::warning('Push notification failed', ['error' => $e->getMessage()]);
+        // チェックイン時クーポン処理（currentCard の checkin_coupon_id）
+        if ($currentCardBeforeUpgrade && !empty($currentCardBeforeUpgrade->checkin_coupon_id)) {
+            $checkinCouponResult = $this->processCouponTrigger(
+                $store, $user->id, $lineUserId,
+                $currentCardBeforeUpgrade->checkin_coupon_id,
+                'checkin'
+            );
+            if ($checkinCouponResult) {
+                if (isset($checkinCouponResult['lottery'])) {
+                    $lotteryResult = $checkinCouponResult['lottery'];
+                } elseif (isset($checkinCouponResult['coupon'])) {
+                    $issuedCoupon = $checkinCouponResult['coupon'];
                 }
             }
         }
 
+        // ランクアップ時クーポン処理
+        if ($upgraded && $upgradedToCardId) {
+            // 新しいランクの定義を取得して rankup_coupon_id を確認
+            $upgradedCard = DB::table('stamp_card_definitions')
+                ->where('id', $upgradedToCardId)
+                ->first();
+
+            if ($upgradedCard && !empty($upgradedCard->rankup_coupon_id)) {
+                // stamp_card_definitions.rankup_coupon_id を使う（新方式）
+                $rankupResult = $this->processCouponTrigger(
+                    $store, $user->id, $lineUserId,
+                    $upgradedCard->rankup_coupon_id,
+                    'rank_up'
+                );
+                if ($rankupResult) {
+                    if (isset($rankupResult['lottery'])) {
+                        $lotteryResult = $rankupResult['lottery'];
+                    } elseif (isset($rankupResult['coupon'])) {
+                        $issuedCoupon = $rankupResult['coupon'];
+                    }
+                }
+            } else {
+                // 旧方式: coupon_templates の type=rank_up & rank_card_id で検索
+                $tpl = DB::table('coupon_templates')
+                    ->where('store_id', $store)
+                    ->where('type', 'rank_up')
+                    ->where('rank_card_id', $upgradedToCardId)
+                    ->where('is_active', true)
+                    ->orderByDesc('id')
+                    ->first();
+
+                if ($tpl) {
+                    if (($tpl->mode ?? 'normal') === 'lottery') {
+                        $lotteryResult = app(LotteryService::class)->draw($store, $user->id, $tpl->id, 'rank_up');
+                    } else {
+                        $userCouponId = DB::table('user_coupons')->insertGetId([
+                            'store_id' => $store,
+                            'user_id' => $user->id,
+                            'coupon_template_id' => $tpl->id,
+                            'status' => 'issued',
+                            'issued_at' => now(),
+                            'used_at' => null,
+                            'expires_at' => null,
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ]);
+
+                        DB::table('coupon_events')->insert([
+                            'user_coupon_id' => $userCouponId,
+                            'event' => 'issued',
+                            'actor' => 'system',
+                            'created_at' => now(),
+                        ]);
+
+                        $issuedCoupon = [
+                            'user_coupon_id' => $userCouponId,
+                            'title' => $tpl->title,
+                            'note' => $tpl->note,
+                            'image_url' => $tpl->image_url,
+                        ];
+                    }
+                }
+            }
+
+            // プッシュ通知
+            try {
+                $msg = $issuedCoupon
+                    ? "🎉 {$upgradedToDisplayName}にランクアップしました！クーポン「{$issuedCoupon['title']}」が発行されました。"
+                    : "🎉 {$upgradedToDisplayName}にランクアップしました！おめでとうございます！";
+                app(LineBotService::class)->pushText($lineUserId, $msg);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Push notification failed', ['error' => $e->getMessage()]);
+            }
+        }
+
         if ($req->expectsJson()) {
-            return response()->json([
+            $response = [
                 'ok' => true,
                 'stamp_total' => (int) $newUser->stamp_total,
                 'card_progress' => (int) $newUser->card_progress,
@@ -307,10 +339,65 @@ class StampCardController extends Controller
                 'upgraded_to_gold' => $upgraded,
                 'upgraded_to' => $upgradedToDisplayName,
                 'issued_coupon' => $issuedCoupon,
-            ]);
+            ];
+
+            if ($lotteryResult) {
+                $response['lottery'] = $lotteryResult;
+            }
+
+            return response()->json($response);
         }
 
         return redirect("/s/{$store}/card");
+    }
+
+    /**
+     * クーポンテンプレートに基づいてクーポン付与 or 抽選を実行
+     */
+    private function processCouponTrigger(int $storeId, int $userId, string $lineUserId, int $couponTemplateId, string $triggerType): ?array
+    {
+        $tpl = DB::table('coupon_templates')
+            ->where('id', $couponTemplateId)
+            ->where('is_active', true)
+            ->first();
+
+        if (!$tpl) {
+            return null;
+        }
+
+        if (($tpl->mode ?? 'normal') === 'lottery') {
+            $result = app(LotteryService::class)->draw($storeId, $userId, $tpl->id, $triggerType);
+            return ['lottery' => $result];
+        }
+
+        // 通常クーポン付与
+        $userCouponId = DB::table('user_coupons')->insertGetId([
+            'store_id' => $storeId,
+            'user_id' => $userId,
+            'coupon_template_id' => $tpl->id,
+            'status' => 'issued',
+            'issued_at' => now(),
+            'used_at' => null,
+            'expires_at' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        DB::table('coupon_events')->insert([
+            'user_coupon_id' => $userCouponId,
+            'event' => 'issued',
+            'actor' => 'system',
+            'created_at' => now(),
+        ]);
+
+        return [
+            'coupon' => [
+                'user_coupon_id' => $userCouponId,
+                'title' => $tpl->title,
+                'note' => $tpl->note,
+                'image_url' => $tpl->image_url,
+            ],
+        ];
     }
 
     public function clear(Request $req, int $store)

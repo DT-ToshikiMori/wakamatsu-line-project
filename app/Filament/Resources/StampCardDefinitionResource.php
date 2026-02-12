@@ -68,6 +68,20 @@ class StampCardDefinitionResource extends Resource
             Forms\Components\Toggle::make('is_active')
                 ->label('有効')
                 ->default(true),
+
+            Forms\Components\Select::make('rankup_coupon_id')
+                ->label('ランクアップ時クーポン')
+                ->relationship('rankupCoupon', 'title')
+                ->searchable()
+                ->nullable()
+                ->helperText('このランクに昇格した時に配布するクーポン'),
+
+            Forms\Components\Select::make('checkin_coupon_id')
+                ->label('チェックイン時クーポン')
+                ->relationship('checkinCoupon', 'title')
+                ->searchable()
+                ->nullable()
+                ->helperText('このランクでチェックインした時に配布するクーポン（任意）'),
         ]);
     }
 

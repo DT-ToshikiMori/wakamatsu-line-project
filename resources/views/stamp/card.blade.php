@@ -405,6 +405,7 @@
   </div>
 </div>
 
+@include('partials.lottery-slot')
 @include('partials.tab-bar', ['tabStoreId' => (int)$store->id, 'tabActive' => 'card'])
 @include('partials.liff-init')
 <script>
@@ -475,6 +476,14 @@
       if(!data.ok) throw new Error('checkin failed');
 
       const next = computeStateFromResponse(data);
+
+      // 抽選演出があればスロットを先に表示
+      if (data.lottery) {
+        await new Promise(resolve => {
+          window._slotCloseCallback = resolve;
+          startSlotAnimation(data.lottery, storeId);
+        });
+      }
 
       // Show rank-up modal and reload after close if upgraded
       if (data.upgraded_to_gold) {

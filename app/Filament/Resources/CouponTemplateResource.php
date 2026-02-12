@@ -41,6 +41,16 @@ class CouponTemplateResource extends Resource
                 ->required()
                 ->live(),
 
+            Forms\Components\Select::make('mode')
+                ->label('モード')
+                ->options([
+                    'normal'  => '通常クーポン',
+                    'lottery' => '抽選クーポン',
+                ])
+                ->default('normal')
+                ->required()
+                ->live(),
+
             Forms\Components\TextInput::make('title')
                 ->label('タイトル')
                 ->required()
@@ -94,6 +104,51 @@ class CouponTemplateResource extends Resource
             Forms\Components\Toggle::make('is_active')
                 ->label('有効')
                 ->default(true),
+
+            // 抽選設定（lottery モード時のみ表示）
+            Forms\Components\Section::make('抽選賞品設定')
+                ->description('確率の合計が100%になるように設定してください')
+                ->visible(fn ($get) => $get('mode') === 'lottery')
+                ->schema([
+                    Forms\Components\Repeater::make('lotteryPrizes')
+                        ->label('賞品')
+                        ->relationship()
+                        ->schema([
+                            Forms\Components\TextInput::make('rank')
+                                ->label('等数（0=ハズレ）')
+                                ->numeric()
+                                ->minValue(0)
+                                ->maxValue(5)
+                                ->required(),
+
+                            Forms\Components\TextInput::make('title')
+                                ->label('賞品名')
+                                ->required()
+                                ->maxLength(255),
+
+                            Forms\Components\TextInput::make('image_url')
+                                ->label('画像URL')
+                                ->maxLength(2000),
+
+                            Forms\Components\TextInput::make('probability')
+                                ->label('確率（%）')
+                                ->numeric()
+                                ->minValue(1)
+                                ->maxValue(100)
+                                ->required()
+                                ->suffix('%'),
+
+                            Forms\Components\Toggle::make('is_miss')
+                                ->label('ハズレ')
+                                ->default(false),
+                        ])
+                        ->columns(2)
+                        ->minItems(1)
+                        ->maxItems(6)
+                        ->defaultItems(1)
+                        ->reorderable(false)
+                        ->addActionLabel('賞品を追加'),
+                ]),
         ]);
     }
 
@@ -103,6 +158,9 @@ class CouponTemplateResource extends Resource
             ->columns([
                 Tables\Columns\TextColumn::make('store.name')->label('店舗')->sortable()->searchable(),
                 Tables\Columns\TextColumn::make('type')->label('種別')->sortable(),
+                Tables\Columns\TextColumn::make('mode')->label('モード')
+                    ->formatStateUsing(fn (string $state) => $state === 'lottery' ? '抽選' : '通常')
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('title')->label('タイトル')->searchable(),
                 Tables\Columns\IconColumn::make('is_active')->label('有効')->boolean(),
                 Tables\Columns\TextColumn::make('updated_at')->label('更新')->dateTime('Y-m-d H:i')->sortable(),
