@@ -37,15 +37,27 @@ class LineUserResource extends Resource
     {
         return $table
             ->columns([
+                Tables\Columns\ImageColumn::make('profile_image_url')
+                    ->label('アイコン')
+                    ->circular()
+                    ->size(36)
+                    ->toggleable(),
+
+                Tables\Columns\TextColumn::make('display_name')
+                    ->label('表示名')
+                    ->searchable()
+                    ->toggleable(),
+
                 Tables\Columns\TextColumn::make('store.name')
                     ->label('店舗')
                     ->sortable()
                     ->toggleable(),
 
                 Tables\Columns\TextColumn::make('line_user_id')
-                    ->label('LINEユーザー')
+                    ->label('LINE ID')
                     ->searchable()
-                    ->copyable(),
+                    ->copyable()
+                    ->toggleable(isToggledHiddenByDefault: true),
 
                 Tables\Columns\TextColumn::make('visit_count')
                     ->label('来店回数')
@@ -72,7 +84,7 @@ class LineUserResource extends Resource
                             // Excel文字化け対策（UTF-8 BOM）
                             fwrite($out, "\xEF\xBB\xBF");
 
-                            fputcsv($out, ['store', 'line_user_id', 'visit_count', 'last_visit_at']);
+                            fputcsv($out, ['store', 'display_name', 'line_user_id', 'visit_count', 'last_visit_at']);
 
                             $query->chunk(500, function ($rows) use ($out) {
                                 foreach ($rows as $u) {
@@ -80,6 +92,7 @@ class LineUserResource extends Resource
 
                                     fputcsv($out, [
                                         $u->store?->name ?? '',
+                                        $u->display_name ?? '',
                                         $u->line_user_id ?? '',
                                         (string)($u->visit_count ?? 0),
                                         $last ? $last->format('Y-m-d H:i:s') : '',

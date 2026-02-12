@@ -11,7 +11,14 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        $middleware->validateCsrfTokens(except: [
+            'webhook/line',
+            'api/liff/init',
+        ]);
+
+        $middleware->alias([
+            'liff' => \App\Http\Middleware\VerifyLiffToken::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>クーポン一覧</title>
+  <meta name="csrf-token" content="{{ csrf_token() }}">
   <style>
     body{margin:0;background:#0b0b0f;color:#fff;font-family:system-ui,-apple-system,BlinkMacSystemFont}
     .wrap{max-width:720px;margin:0 auto;padding:18px 14px 28px}
@@ -42,18 +43,18 @@
   </style>
 </head>
 <body>
+  @include('partials.liff-loading')
   <div class="wrap">
     <div class="top">
       <div>
         <h1 class="h1">クーポン一覧</h1>
-        <div class="sub">u={{ $lineUserId }} / store={{ $storeId }}</div>
       </div>
       <div class="pill">{{ count($coupons) }}件</div>
     </div>
 
     <div class="grid">
       @foreach($coupons as $c)
-        <a class="card" href="{{ route('coupons.show', ['userCouponId' => $c->user_coupon_id, 'store' => $storeId, 'u' => $lineUserId]) }}">
+        <a class="card" href="{{ route('coupons.show', ['userCouponId' => $c->user_coupon_id, 'store' => $storeId]) }}">
           <img class="img" src="{{ $c->image_url ?? 'https://placehold.co/900x300/png?text=COUPON' }}" alt="coupon">
           <div class="body">
             <div class="row">
@@ -78,5 +79,6 @@
       @endforeach
     </div>
   </div>
+  @include('partials.liff-init')
 </body>
 </html>

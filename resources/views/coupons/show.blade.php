@@ -76,11 +76,11 @@
   </style>
 </head>
 <body>
+@include('partials.liff-loading')
 <div class="wrap">
   <div class="top">
     <div>
       <h1 class="h1">クーポン詳細</h1>
-      <div class="sub">store={{ $storeId }} / u={{ $lineUserId }} / id={{ $coupon->user_coupon_id }}</div>
     </div>
     <div class="pill">{{ $isUsed ? '使用済み' : '未使用' }}</div>
   </div>
@@ -102,7 +102,7 @@
           @if(!$isUsed)
             <div class="btnRow">
               <button class="btn" id="useBtn" type="button">使用する（レジで提示）</button>
-              <a class="btn secondary" href="{{ route('coupons.index', ['store' => (int)$storeId, 'u' => $lineUserId]) }}">一覧に戻る</a>
+              <a class="btn secondary" href="{{ route('coupons.index', ['store' => (int)$storeId]) }}">一覧に戻る</a>
             </div>
 
             <div class="verifyBox hidden" id="verifyBox">
@@ -114,7 +114,7 @@
             </div>
           @else
             <div class="used">
-              ✅ 使用済みです
+              使用済みです
               @if(!empty($usedAt))
                 <span style="opacity:.7;font-weight:600;margin-left:6px;">
                   ({{ \Carbon\Carbon::parse($usedAt)->format('Y/m/d H:i') }})
@@ -122,7 +122,7 @@
               @endif
             </div>
             <div class="btnRow">
-              <a class="btn secondary" href="{{ route('coupons.index', ['store' => (int)$storeId, 'u' => $lineUserId]) }}">一覧に戻る</a>
+              <a class="btn secondary" href="{{ route('coupons.index', ['store' => (int)$storeId]) }}">一覧に戻る</a>
             </div>
           @endif
 
@@ -132,13 +132,13 @@
   </div>
 </div>
 
+@include('partials.liff-init')
 <script>
   const wrap = document.getElementById('rotateWrap');
   const useBtn = document.getElementById('useBtn');
   const confirmBtn = document.getElementById('confirmBtn');
   const verifyBox = document.getElementById('verifyBox');
   const clock = document.getElementById('clock');
-  const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 
   function tick(){
     if (!clock) return;
@@ -149,7 +149,6 @@
   tick();
   if (clock) setInterval(tick, 1000);
 
-  // 「使用する」を押したら回転＋verifyBox表示
   if (useBtn) useBtn.addEventListener('click', () => {
     wrap.classList.add('rotated');
     if (verifyBox) verifyBox.classList.remove('hidden');
@@ -161,14 +160,9 @@
 
       const res = await fetch(`{{ route('coupons.use', ['userCouponId' => $coupon->user_coupon_id]) }}`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'X-CSRF-TOKEN': csrf
-        },
+        headers: liffHeaders(),
         body: JSON.stringify({
-          store: {{ (int)$storeId }},
-          u: @json($lineUserId)
+          store: {{ (int)$storeId }}
         })
       });
 
@@ -178,7 +172,7 @@
         return;
       }
 
-      alert('✅ 使用完了');
+      alert('使用完了');
       window.location.reload();
     });
   }

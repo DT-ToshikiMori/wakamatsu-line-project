@@ -2,16 +2,20 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\LineBotService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class StampCardController extends Controller
 {
-   
+
     public function card(Request $req, int $store)
     {
-        $lineUserId = (string) $req->query('u', '');
-        abort_if($lineUserId === '', 400, 'u is required. e.g. ?u=demo_user_1');
+        $lineUserId = $req->attributes->get('line_user_id');
+        abort_if(!$lineUserId, 401, 'LIFF認証が必要です');
+
+        $displayName = $req->attributes->get('line_display_name');
+        $picture = $req->attributes->get('line_picture');
 
         $storeRow = DB::table('stores')->where('id', $store)->first();
         abort_if(!$storeRow, 404, 'store not found');
@@ -22,6 +26,8 @@ class StampCardController extends Controller
             $userId = DB::table('users')->insertGetId([
                 'store_id' => $store,
                 'line_user_id' => $lineUserId,
+                'display_name' => $displayName,
+                'profile_image_url' => $picture,
                 'first_visit_at' => null,
                 'last_visit_at' => null,
                 'visit_count' => 0,
@@ -33,6 +39,20 @@ class StampCardController extends Controller
                 'updated_at' => now(),
             ]);
             $user = DB::table('users')->where('id', $userId)->first();
+        } else {
+            // プロフィール情報を更新
+            $updates = [];
+            if ($displayName && $displayName !== $user->display_name) {
+                $updates['display_name'] = $displayName;
+            }
+            if ($picture && $picture !== $user->profile_image_url) {
+                $updates['profile_image_url'] = $picture;
+            }
+            if (!empty($updates)) {
+                $updates['updated_at'] = now();
+                DB::table('users')->where('id', $user->id)->update($updates);
+                $user = DB::table('users')->where('id', $user->id)->first();
+            }
         }
 
         // ① 店舗のランク定義（priority順）
@@ -71,14 +91,12 @@ class StampCardController extends Controller
         }
 
         $isBeginner = ($currentCard->name === 'BEGINNER');
-        $isGold = !$isBeginner; // view互換：BEGINNER以外は「Gold系」として扱う
+        $isGold = !$isBeginner;
 
-        // view互換：goal/progress/remaining/nextReward を整える
-        $goal = (int) $currentCard->required_stamps;          // BEGINNERなら3, GOLDなら5, BLACKなら10...
-        $progress = (int) ($user->card_progress ?? 0);        // ランク内進捗
+        $goal = (int) $currentCard->required_stamps;
+        $progress = (int) ($user->card_progress ?? 0);
         $remaining = max(0, $goal - $progress);
 
-        // 次のカード（昇格先）があるなら案内（なければ最上位）
         $nextCard = $cards->firstWhere('priority', $currentCard->priority + 1);
         if ($isBeginner) {
             $nextReward = [
@@ -86,7 +104,6 @@ class StampCardController extends Controller
                 'text' => ($nextCard ? ($nextCard->display_name . ' 昇格') : 'ランクアップ')
             ];
         } else {
-            // GOLD/BLACKはあなたのUI方針に合わせて「常時特典」扱い
             $nextReward = ['at' => null, 'text' => '会員特典'];
             $remaining = 0;
         }
@@ -98,7 +115,6 @@ class StampCardController extends Controller
             'user' => $user,
             'lineUserId' => $lineUserId,
 
-            // 既存view互換
             'goal' => $goal,
             'isGold' => $isGold,
             'progress' => $progress,
@@ -106,7 +122,6 @@ class StampCardController extends Controller
             'remaining' => $remaining,
             'flash' => $flash,
 
-            // 新しい“正”も渡しておく（次のview改修で使う）
             'cards' => $cards,
             'currentCard' => $currentCard,
             'nextCard' => $nextCard,
@@ -116,8 +131,8 @@ class StampCardController extends Controller
 
     public function checkin(Request $req, int $store)
     {
-        $lineUserId = (string) $req->input('u', '');
-        abort_if($lineUserId === '', 400, 'u is required.');
+        $lineUserId = $req->attributes->get('line_user_id');
+        abort_if(!$lineUserId, 401, 'LIFF認証が必要です');
 
         $user = DB::table('users')
             ->where('store_id', $store)
@@ -131,7 +146,7 @@ class StampCardController extends Controller
         $upgraded = false;
         $upgradedToCardId = null;
         $upgradedToDisplayName = null;
-        $issuedCoupon = null; // ['user_coupon_id'=>..., 'title'=>..., 'note'=>..., 'image_url'=>...]
+        $issuedCoupon = null;
 
         DB::transaction(function () use ($store, $user, $visitedAt, $requestId, &$upgraded, &$upgradedToCardId, &$upgradedToDisplayName) {
 
@@ -179,7 +194,6 @@ class StampCardController extends Controller
                 );
 
                 if ($nextCard) {
-                    // ランクアップ
                     DB::table('users')->where('id', $user->id)->update([
                         'stamp_total' => $nextStampTotal,
                         'current_card_id' => $nextCard->id,
@@ -190,7 +204,6 @@ class StampCardController extends Controller
                     $upgradedToCardId = $nextCard->id;
                     $upgradedToDisplayName = $nextCard->display_name ?? $nextCard->name ?? 'RANK UP';
                 } else {
-                    // 最上位 → ループ
                     DB::table('users')->where('id', $user->id)->update([
                         'stamp_total' => $nextStampTotal,
                         'card_progress' => 0,
@@ -198,7 +211,6 @@ class StampCardController extends Controller
                 }
 
             } else {
-                // 通常進行
                 DB::table('users')->where('id', $user->id)->update([
                     'stamp_total' => $nextStampTotal,
                     'card_progress' => $nextProgress,
@@ -240,7 +252,6 @@ class StampCardController extends Controller
                     'updated_at' => now(),
                 ]);
 
-                // optional: coupon_events
                 if (DB::getSchemaBuilder()->hasTable('coupon_events')) {
                     DB::table('coupon_events')->insert([
                         'user_coupon_id' => $userCouponId,
@@ -249,7 +260,6 @@ class StampCardController extends Controller
                         'created_at' => now(),
                     ]);
                 }
-                
 
                 $issuedCoupon = [
                     'user_coupon_id' => $userCouponId,
@@ -257,6 +267,28 @@ class StampCardController extends Controller
                     'note' => $tpl->note,
                     'image_url' => $tpl->image_url,
                 ];
+
+                // プッシュ通知：クーポン発行
+                try {
+                    app(LineBotService::class)->pushText(
+                        $lineUserId,
+                        "🎉 {$upgradedToDisplayName}にランクアップしました！クーポン「{$tpl->title}」が発行されました。"
+                    );
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::warning('Push notification failed', ['error' => $e->getMessage()]);
+                }
+            }
+
+            // プッシュ通知：ランクアップ（クーポンがない場合でも）
+            if (!$tpl) {
+                try {
+                    app(LineBotService::class)->pushText(
+                        $lineUserId,
+                        "🎉 {$upgradedToDisplayName}にランクアップしました！おめでとうございます！"
+                    );
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::warning('Push notification failed', ['error' => $e->getMessage()]);
+                }
             }
         }
 
@@ -274,13 +306,13 @@ class StampCardController extends Controller
             ]);
         }
 
-        return redirect("/s/{$store}/card?u=" . urlencode($lineUserId));
+        return redirect("/s/{$store}/card");
     }
 
     public function clear(Request $req, int $store)
     {
-        $lineUserId = (string) $req->input('u', '');
-        abort_if($lineUserId === '', 400, 'u is required.');
+        $lineUserId = $req->attributes->get('line_user_id');
+        abort_if(!$lineUserId, 401, 'LIFF認証が必要です');
 
         $user = DB::table('users')
             ->where('store_id', $store)
@@ -289,13 +321,11 @@ class StampCardController extends Controller
         abort_if(!$user, 404, 'user not found');
 
         DB::transaction(function () use ($store, $user) {
-            // Delete visits for this user and store
             DB::table('visits')
                 ->where('store_id', $store)
                 ->where('user_id', $user->id)
                 ->delete();
 
-            // Reset user counters and state
             DB::table('users')->where('id', $user->id)->update([
                 'first_visit_at' => null,
                 'last_visit_at' => null,
@@ -321,6 +351,6 @@ class StampCardController extends Controller
             ]);
         }
 
-        return redirect("/s/{$store}/card?u=" . urlencode($lineUserId));
+        return redirect("/s/{$store}/card");
     }
 }

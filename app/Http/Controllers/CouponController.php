@@ -13,9 +13,10 @@ class CouponController extends Controller
     public function index(Request $req)
     {
         $storeId = (int) $req->query('store', 0);
-        $lineUserId = (string) $req->query('u', '');
         abort_if($storeId <= 0, 400, 'store is required');
-        abort_if($lineUserId === '', 400, 'u is required');
+
+        $lineUserId = $req->attributes->get('line_user_id');
+        abort_if(!$lineUserId, 401, 'LIFF認証が必要です');
 
         $user = DB::table('users')
             ->where('store_id', $storeId)
@@ -44,7 +45,6 @@ class CouponController extends Controller
 
         return view('coupons.index', [
             'storeId' => $storeId,
-            'lineUserId' => $lineUserId,
             'coupons' => $coupons,
         ]);
     }
@@ -55,9 +55,10 @@ class CouponController extends Controller
     public function show(Request $req, int $userCouponId)
     {
         $storeId = (int) $req->query('store', 0);
-        $lineUserId = (string) $req->query('u', '');
         abort_if($storeId <= 0, 400, 'store is required');
-        abort_if($lineUserId === '', 400, 'u is required');
+
+        $lineUserId = $req->attributes->get('line_user_id');
+        abort_if(!$lineUserId, 401, 'LIFF認証が必要です');
 
         $user = DB::table('users')
             ->where('store_id', $storeId)
@@ -86,7 +87,6 @@ class CouponController extends Controller
 
         return view('coupons.show', [
             'storeId' => $storeId,
-            'lineUserId' => $lineUserId,
             'coupon' => $coupon,
             'isUsed' => !empty($coupon->used_at) || $coupon->status === 'used',
             'usedAt' => $coupon->used_at,
@@ -99,9 +99,10 @@ class CouponController extends Controller
     public function use(Request $req, int $userCouponId)
     {
         $storeId = (int) $req->input('store', 0);
-        $lineUserId = (string) $req->input('u', '');
         abort_if($storeId <= 0, 400, 'store is required');
-        abort_if($lineUserId === '', 400, 'u is required');
+
+        $lineUserId = $req->attributes->get('line_user_id');
+        abort_if(!$lineUserId, 401, 'LIFF認証が必要です');
 
         $user = DB::table('users')
             ->where('store_id', $storeId)
@@ -133,7 +134,6 @@ class CouponController extends Controller
         return redirect()->route('coupons.show', [
             'userCouponId' => $userCouponId,
             'store' => $storeId,
-            'u' => $lineUserId,
         ]);
     }
 }

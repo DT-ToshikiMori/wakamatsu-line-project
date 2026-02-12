@@ -327,6 +327,7 @@
     --logo-opacity: {{ $currentCard->theme_logo_opacity ?? 0.10 }};
   "
 >
+@include('partials.liff-loading')
 <div class="bgLogoWrap">
   <img src="/logo.png" alt="logo" class="bgLogo">
 </div>
@@ -381,9 +382,8 @@
     </div>
 
     <button class="btn" id="checkinBtn" type="button">チェックイン（スタンプ+1）</button>
-    <button class="btn secondary" id="clearBtn" type="button" style="margin-top:10px;">スタンプをクリア（テスト用）</button>
     <div class="navLink">
-      <a href="/coupons?store={{ (int)$store->id }}&u={{ urlencode($lineUserId) }}">
+      <a href="/coupons?store={{ (int)$store->id }}">
         クーポンを見る
       </a>
     </div>
@@ -403,23 +403,22 @@
     </div>
 
     <div class="modalActions">
-      <a class="mbtn secondary" role="button" aria-label="クーポン一覧へ" href="/coupons?store={{ (int)$store->id }}&u={{ urlencode($lineUserId) }}">クーポン一覧へ</a>
+      <a class="mbtn secondary" role="button" aria-label="クーポン一覧へ" href="/coupons?store={{ (int)$store->id }}">クーポン一覧へ</a>
       <button class="mbtn secondary" id="goldOk" type="button">閉じる</button>
     </div>
   </div>
 </div>
 
+@include('partials.liff-init')
 <script>
   const storeId = {{ (int)$store->id }};
   const goal = {{ (int)$goal }};
-  const u = @json($lineUserId);
   const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 
   const currentCardId = @json($currentCard->id ?? null);
   const isBeginnerInitial = @json($isBeginner ?? false);
 
   const btn = document.getElementById('checkinBtn');
-  const clearBtn = document.getElementById('clearBtn');
   const goldModal = document.getElementById('goldModal');
   const goldOk = document.getElementById('goldOk');
   const rankupTitle = document.getElementById('rankupTitle');
@@ -435,7 +434,6 @@
   let pendingReloadAfterModal = false;
 
   function computeStateFromResponse(data){
-    // Prefer DB-driven fields
     const cardProgress = (data.card_progress !== undefined && data.card_progress !== null)
       ? parseInt(data.card_progress, 10)
       : 0;
@@ -456,7 +454,7 @@
 
   function paintStamps(progress){
     const wrap = document.getElementById('stampsWrap');
-    if (!wrap) return; // Goldでは存在しない
+    if (!wrap) return;
     wrap.querySelectorAll('.stamp').forEach(el => {
       const i = parseInt(el.dataset.i, 10);
       if (i <= progress) {
@@ -466,33 +464,6 @@
       }
     });
   }
-  
-  clearBtn.addEventListener('click', async () => {
-    if (!confirm('スタンプ/来店回数をクリアします（テスト用）。よろしいですか？')) return;
-    clearBtn.disabled = true;
-    try {
-      const res = await fetch(`/s/${storeId}/clear`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'X-CSRF-TOKEN': csrf
-        },
-        body: JSON.stringify({ u })
-      });
-      const data = await res.json();
-      if(!data.ok) throw new Error('clear failed');
-
-      // Reset: reload to server-rendered initial state
-      window.location.href = `/s/${storeId}/card?u=${encodeURIComponent(u)}`;
-      return;
-    } catch (e) {
-      alert('クリアに失敗しました。もう一度お試しください。');
-      console.error(e);
-    } finally {
-      clearBtn.disabled = false;
-    }
-  });
 
   btn.addEventListener('click', async () => {
     btn.disabled = true;
@@ -500,12 +471,7 @@
     try {
       const res = await fetch(`/s/${storeId}/checkin`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'X-CSRF-TOKEN': csrf
-        },
-        body: JSON.stringify({ u })
+        headers: liffHeaders(),
       });
 
       const data = await res.json();
@@ -515,12 +481,10 @@
 
       // Show rank-up modal and reload after close if upgraded
       if (data.upgraded_to_gold) {
-        // Update modal title with the upgraded rank name if provided
         if (rankupTitle && data.upgraded_to) {
           rankupTitle.textContent = `${data.upgraded_to} にランクアップ！`;
         }
 
-        // If server issued a real coupon, render it
         if (data.issued_coupon) {
           if (rankupCouponImg && data.issued_coupon.image_url) {
             rankupCouponImg.src = data.issued_coupon.image_url;
@@ -533,7 +497,6 @@
           }
         }
 
-        // show modal first, then reload after close to render the new rank UI
         pendingReloadAfterModal = true;
         goldModal.classList.add('on');
         return;

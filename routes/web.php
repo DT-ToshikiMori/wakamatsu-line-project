@@ -5,7 +5,16 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\StampCardController;
 use App\Http\Controllers\CouponController;
+use App\Http\Controllers\LiffController;
+use App\Http\Controllers\LineWebhookController;
 
+// LIFF初期化API（認証前に呼ばれるのでミドルウェア不要）
+Route::post('/api/liff/init', [LiffController::class, 'init']);
+
+// LINE Webhook（CSRF除外 → VerifyCsrfToken で除外設定が必要）
+Route::post('/webhook/line', [LineWebhookController::class, 'handle']);
+
+// 管理画面（認証はFilamentが担当）
 Route::get('/admin/users', function (Request $req) {
     $storeId = $req->integer('store_id');
     $daysGte = $req->integer('days_gte');
@@ -27,6 +36,7 @@ Route::get('/admin/users', function (Request $req) {
     ]);
 });
 
+// QRリダイレクト → LIFF URLへ
 Route::get('/r/{slug}', function (Request $req, string $slug) {
     $link = DB::table('store_qr_links')
         ->where('slug', $slug)
@@ -35,71 +45,30 @@ Route::get('/r/{slug}', function (Request $req, string $slug) {
 
     abort_if(!$link, 404, 'QR link not found');
 
-    // 店舗の確定（デモは固定 store_id を qr_link に入れておくのが最強）
     $storeId = $link->store_id ?? $req->integer('store_id');
     abort_if(!$storeId, 400, 'store_id is required');
 
-    // デモ用：ユーザー特定は仮（本番はLIFFログインに差し替え）
-    $lineUserId = $req->query('u') ?: ('anon_' . substr(sha1($req->ip().'|'.$req->userAgent()), 0, 10));
+    $liffId = config('services.line.liff_id');
 
-    // 二重押下防止（URLにrid付けるとデモが安定）
-    $requestId = $req->query('rid') ?: ('r_' . bin2hex(random_bytes(8)));
-    $visitedAt = now();
+    if ($liffId) {
+        // LIFF URLへリダイレクト（LINEアプリ内で開く）
+        $path = urlencode("/s/{$storeId}/card");
+        return redirect("https://liff.line.me/{$liffId}?path={$path}");
+    }
 
-    DB::transaction(function () use ($storeId, $lineUserId, $requestId, $visitedAt, $link) {
-        $user = DB::table('users')
-            ->where('store_id', $storeId)
-            ->where('line_user_id', $lineUserId)
-            ->first();
-
-        if (!$user) {
-            $userId = DB::table('users')->insertGetId([
-                'store_id'       => $storeId,
-                'line_user_id'   => $lineUserId,
-                'first_visit_at' => $visitedAt,
-                'last_visit_at'  => $visitedAt,
-                'visit_count'    => 0,
-                'created_at'     => now(),
-                'updated_at'     => now(),
-            ]);
-        } else {
-            $userId = $user->id;
-        }
-
-        $exists = DB::table('visits')
-            ->where('store_id', $storeId)
-            ->where('request_id', $requestId)
-            ->exists();
-
-        if (!$exists) {
-            DB::table('visits')->insert([
-                'store_id'   => $storeId,
-                'user_id'    => $userId,
-                'qr_link_id' => $link->id,
-                'visited_at' => $visitedAt,
-                'request_id' => $requestId,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-
-            DB::table('users')->where('id', $userId)->update([
-                'last_visit_at' => $visitedAt,
-                'visit_count'   => DB::raw('visit_count + 1'),
-                'updated_at'    => now(),
-            ]);
-        }
-    });
-
-    // redirect_url未設定ならデモ用メッセージ
+    // LIFF未設定時はリダイレクトURLへフォールバック
     return view('redirect', [
         'redirectUrl' => $link->redirect_url,
     ]);
 });
 
-Route::get('/s/{store}/card', [StampCardController::class, 'card']);
-Route::post('/s/{store}/checkin', [StampCardController::class, 'checkin']);
-Route::post('/s/{store}/clear', [StampCardController::class, 'clear']);
+// LIFF認証が必要なルート
+Route::middleware('liff')->group(function () {
+    Route::get('/s/{store}/card', [StampCardController::class, 'card']);
+    Route::post('/s/{store}/checkin', [StampCardController::class, 'checkin']);
+    Route::post('/s/{store}/clear', [StampCardController::class, 'clear']);
 
-Route::get('/coupons', [CouponController::class, 'index'])->name('coupons.index');
-Route::get('/coupons/{userCouponId}', [CouponController::class, 'show'])->name('coupons.show');
-Route::post('/coupons/{userCouponId}/use', [CouponController::class, 'use'])->name('coupons.use');
+    Route::get('/coupons', [CouponController::class, 'index'])->name('coupons.index');
+    Route::get('/coupons/{userCouponId}', [CouponController::class, 'show'])->name('coupons.show');
+    Route::post('/coupons/{userCouponId}/use', [CouponController::class, 'use'])->name('coupons.use');
+});
