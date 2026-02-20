@@ -1,17 +1,21 @@
 #!/bin/bash
 set -e
 
-# Railway の環境変数があれば .env に反映
-if [ -n "$APP_KEY" ]; then
-    sed -i "s|^APP_KEY=.*|APP_KEY=$APP_KEY|" .env
-fi
+# Railway の環境変数を .env に反映
+env_vars=("APP_KEY" "APP_ENV" "APP_DEBUG" "APP_URL" "DB_CONNECTION" "DATABASE_URL"
+           "DB_HOST" "DB_PORT" "DB_DATABASE" "DB_USERNAME" "DB_PASSWORD")
 
-if [ -n "$DATABASE_URL" ]; then
-    echo "DATABASE_URL=$DATABASE_URL" >> .env
-fi
+for var in "${env_vars[@]}"; do
+    if [ -n "${!var}" ]; then
+        if grep -q "^${var}=" .env 2>/dev/null; then
+            sed -i "s|^${var}=.*|${var}=${!var}|" .env
+        else
+            echo "${var}=${!var}" >> .env
+        fi
+    fi
+done
 
-# SQLite の場合 DB ファイル確認
-touch database/database.sqlite
 php artisan migrate --force 2>/dev/null || true
+php artisan config:cache 2>/dev/null || true
 
 exec php -S 0.0.0.0:8080 -t public

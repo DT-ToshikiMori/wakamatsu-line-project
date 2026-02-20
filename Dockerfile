@@ -2,8 +2,8 @@ FROM php:8.4-cli
 
 # 必要な拡張 + Node.js 22 + SQLite
 RUN apt-get update && apt-get install -y \
-    git unzip libicu-dev libzip-dev curl libsqlite3-dev \
-    && docker-php-ext-install intl zip pdo pdo_mysql pdo_sqlite \
+    git unzip libicu-dev libzip-dev curl libsqlite3-dev libpq-dev \
+    && docker-php-ext-install intl zip pdo pdo_mysql pdo_sqlite pdo_pgsql \
     && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
@@ -30,9 +30,7 @@ RUN cp .env.example .env && php artisan key:generate
 # Laravel セットアップ
 RUN composer run-script post-autoload-dump \
     && npm run build \
-    && chmod -R 775 storage bootstrap/cache \
-    && touch database/database.sqlite \
-    && php artisan migrate --force
+    && chmod -R 775 storage bootstrap/cache
 
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
