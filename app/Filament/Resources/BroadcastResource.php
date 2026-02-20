@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\BroadcastResource\Pages;
 use App\Models\Broadcast;
+use App\Models\CouponTemplate;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -101,7 +102,23 @@ class BroadcastResource extends Resource
                                 ->label('クーポンテンプレート')
                                 ->relationship('couponTemplate', 'title')
                                 ->searchable()
+                                ->live()
+                                ->afterStateUpdated(function ($state, Forms\Set $set) {
+                                    if ($state) {
+                                        $coupon = CouponTemplate::find($state);
+                                        $set('coupon_template_title', $coupon?->title ?? '');
+                                        $set('coupon_template_note', $coupon?->note ?? '');
+                                        $set('coupon_template_image_url', $coupon?->image_url ?? '');
+                                    }
+                                })
                                 ->visible(fn ($get) => $get('bubble_type') === 'coupon'),
+
+                            Forms\Components\Hidden::make('coupon_template_title')
+                                ->dehydrated(false),
+                            Forms\Components\Hidden::make('coupon_template_note')
+                                ->dehydrated(false),
+                            Forms\Components\Hidden::make('coupon_template_image_url')
+                                ->dehydrated(false),
                         ])
                         ->minItems(1)
                         ->maxItems(3)
