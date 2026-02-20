@@ -3,7 +3,9 @@ FROM php:8.4-cli
 # 必要な拡張 + Node.js 22 + SQLite
 RUN apt-get update && apt-get install -y \
     git unzip libicu-dev libzip-dev curl libsqlite3-dev libpq-dev \
-    && docker-php-ext-install intl zip pdo pdo_mysql pdo_sqlite pdo_pgsql \
+    libpng-dev libjpeg62-turbo-dev libwebp-dev libfreetype6-dev \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \
+    && docker-php-ext-install intl zip pdo pdo_mysql pdo_sqlite pdo_pgsql gd \
     && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/*
