@@ -15,7 +15,7 @@ WORKDIR /app
 
 # composer 先行
 COPY composer.json composer.lock ./
-RUN composer install --no-dev --optimize-autoloader
+RUN composer install --no-dev --optimize-autoloader --no-scripts
 
 # Node.js 依存 先行
 COPY package.json ./
@@ -24,8 +24,8 @@ RUN npm install
 # アプリ本体
 COPY . .
 
-# フロントエンドビルド
-RUN npm run build
+# Composer スクリプト実行 + フロントエンドビルド
+RUN composer run-script post-autoload-dump && npm run build
 
 EXPOSE 8080
 CMD php -S 0.0.0.0:8080 -t public
