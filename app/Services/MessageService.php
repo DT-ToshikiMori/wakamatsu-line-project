@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\CouponTemplate;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -80,7 +81,7 @@ class MessageService
         $this->lineBotService->pushFlexMessage(
             $user->line_user_id,
             "クーポン: {$tpl->title}",
-            $this->buildCouponFlexContents($tpl->title, $tpl->note ?? '', $tpl->image_url, $expiresText, $claimUrl)
+            $this->buildCouponFlexContents($tpl->title, $tpl->note ?? '', CouponTemplate::resolveImageUrl($tpl->image_url), $expiresText, $claimUrl)
         );
     }
 

@@ -94,7 +94,7 @@ class ChurnScenarioResource extends Resource
                                         $coupon = CouponTemplate::find($state);
                                         $set('coupon_template_title', $coupon?->title ?? '');
                                         $set('coupon_template_note', $coupon?->note ?? '');
-                                        $set('coupon_template_image_url', $coupon?->image_url ?? '');
+                                        $set('coupon_template_image_url', CouponTemplate::resolveImageUrl($coupon?->image_url) ?? '');
                                     }
                                 })
                                 ->visible(fn ($get) => $get('bubble_type') === 'coupon'),

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Storage;
 
 class CouponTemplate extends Model
 {
@@ -15,6 +16,16 @@ class CouponTemplate extends Model
         'required_stamps',
         'rank_card_id',
     ];
+
+    /**
+     * image_url(パス or フルURL)を公開URLに変換
+     */
+    public static function resolveImageUrl(?string $value): ?string
+    {
+        if (!$value) return null;
+        if (str_starts_with($value, 'http')) return $value;
+        return url('storage/' . $value);
+    }
 
     public function store()
     {

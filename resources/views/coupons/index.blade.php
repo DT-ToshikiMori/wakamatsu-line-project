@@ -96,7 +96,7 @@
           $cls = $status === 'issued' ? 'unused' : ($status === 'used' ? 'used' : 'expired');
         @endphp
         <a class="card" href="/coupons/{{ $c->user_coupon_id }}?store={{ $storeId }}" data-status="{{ $isAvailable ? 'available' : 'used' }}">
-          <img class="img" src="{{ $c->image_url ?? 'https://placehold.co/900x300/png?text=COUPON' }}" alt="coupon">
+          <img class="img" src="{{ \App\Models\CouponTemplate::resolveImageUrl($c->image_url) ?? 'https://placehold.co/900x300/png?text=COUPON' }}" alt="coupon">
           <div class="body">
             <div class="row">
               <div class="title">{{ $c->title }}</div>

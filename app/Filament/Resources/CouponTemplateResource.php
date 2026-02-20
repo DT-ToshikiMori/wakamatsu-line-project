@@ -60,9 +60,17 @@ class CouponTemplateResource extends Resource
                 ->label('備考')
                 ->rows(3),
 
-            Forms\Components\TextInput::make('image_url')
-                ->label('画像URL（300x900想定）')
-                ->maxLength(2000),
+            Forms\Components\FileUpload::make('image_url')
+                ->label('ヘッダー画像（横長 3:1）')
+                ->disk('public')
+                ->directory('coupon-images')
+                ->image()
+                ->imageResizeMode('cover')
+                ->imageCropAspectRatio('3:1')
+                ->imageResizeTargetWidth(900)
+                ->imageResizeTargetHeight(300)
+                ->maxSize(2048)
+                ->helperText('推奨: 900×300px / 最大2MB'),
 
             // 誕生日
             Forms\Components\TextInput::make('birthday_offset_days')
@@ -156,6 +164,11 @@ class CouponTemplateResource extends Resource
     {
         return $table
             ->columns([
+                Tables\Columns\ImageColumn::make('image_url')
+                    ->label('画像')
+                    ->disk('public')
+                    ->width(72)
+                    ->height(24),
                 Tables\Columns\TextColumn::make('store.name')->label('店舗')->sortable()->searchable(),
                 Tables\Columns\TextColumn::make('type')->label('種別')->sortable(),
                 Tables\Columns\TextColumn::make('mode')->label('モード')

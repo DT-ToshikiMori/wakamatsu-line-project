@@ -65,7 +65,7 @@
   <h1 class="h1">クーポン取得</h1>
 
   <div class="card">
-    <img class="img" src="{{ $tpl->image_url ?? 'https://placehold.co/900x300/png?text=COUPON' }}" alt="coupon">
+    <img class="img" src="{{ \App\Models\CouponTemplate::resolveImageUrl($tpl->image_url) ?? 'https://placehold.co/900x300/png?text=COUPON' }}" alt="coupon">
     <div class="body">
       <div class="title">{{ $tpl->title }}</div>
       @if($tpl->note)

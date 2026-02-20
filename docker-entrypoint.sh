@@ -16,6 +16,7 @@ for var in "${env_vars[@]}"; do
 done
 
 php artisan migrate --force 2>/dev/null || true
+php artisan storage:link 2>/dev/null || true
 php artisan config:cache 2>/dev/null || true
 
 exec php -S 0.0.0.0:8080 -t public
