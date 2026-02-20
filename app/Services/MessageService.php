@@ -69,17 +69,18 @@ class MessageService
 
         $expiresText = $this->buildExpiresText($bubble);
 
-        $postbackData = http_build_query([
-            'action' => 'claim_coupon',
+        $liffId = config('services.line.liff_id');
+        $claimUrl = "https://liff.line.me/{$liffId}/coupons/claim?" . http_build_query([
             'bubble_id' => $bubble->id,
             'tpl_id' => $tpl->id,
             'sent_at' => now()->timestamp,
+            'store' => $user->store_id,
         ]);
 
         $this->lineBotService->pushFlexMessage(
             $user->line_user_id,
             "クーポン: {$tpl->title}",
-            $this->buildCouponFlexContents($tpl->title, $tpl->note ?? '', $tpl->image_url, $expiresText, $postbackData)
+            $this->buildCouponFlexContents($tpl->title, $tpl->note ?? '', $tpl->image_url, $expiresText, $claimUrl)
         );
     }
 
@@ -101,7 +102,7 @@ class MessageService
         return null;
     }
 
-    private function buildCouponFlexContents(string $title, string $note, ?string $imageUrl, ?string $expiresText = null, ?string $postbackData = null): array
+    private function buildCouponFlexContents(string $title, string $note, ?string $imageUrl, ?string $expiresText = null, ?string $claimUrl = null): array
     {
         $bodyContents = [
             [
@@ -148,12 +149,11 @@ class MessageService
             ];
         }
 
-        $buttonAction = $postbackData
+        $buttonAction = $claimUrl
             ? [
-                'type' => 'postback',
+                'type' => 'uri',
                 'label' => 'クーポンを取得する',
-                'data' => $postbackData,
-                'displayText' => 'クーポンを取得する',
+                'uri' => $claimUrl,
             ]
             : [
                 'type' => 'uri',

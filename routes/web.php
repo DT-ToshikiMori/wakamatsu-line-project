@@ -74,6 +74,8 @@ Route::middleware('liff')->group(function () {
     Route::post('/s/{store}/clear', [StampCardController::class, 'clear']);
 
     Route::get('/coupons', [CouponController::class, 'index'])->name('coupons.index');
+    Route::get('/coupons/claim', [CouponController::class, 'claimPage'])->name('coupons.claim');
+    Route::post('/coupons/claim', [CouponController::class, 'claim'])->name('coupons.claim.store');
     Route::get('/coupons/{userCouponId}', [CouponController::class, 'show'])->name('coupons.show');
     Route::post('/coupons/{userCouponId}/use', [CouponController::class, 'use'])->name('coupons.use');
 });
