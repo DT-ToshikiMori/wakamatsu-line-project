@@ -115,7 +115,7 @@ class MessageService
             $this->lineBotService->pushFlexMessage(
                 $user->line_user_id,
                 "クーポン: {$tpl->title}",
-                $this->buildCouponFlexContents($tpl->title, $tpl->note ?? '', $tpl->image_url)
+                $this->buildCouponFlexContents($tpl->title, $tpl->note ?? '', $tpl->image_url, $bubble->coupon_expires_text ?? null)
             );
         }
     }
@@ -123,26 +123,50 @@ class MessageService
     /**
      * クーポン通知用 Flex Message の contents を組み立て
      */
-    private function buildCouponFlexContents(string $title, string $note, ?string $imageUrl): array
+    private function buildCouponFlexContents(string $title, string $note, ?string $imageUrl, ?string $expiresText = null): array
     {
         $bodyContents = [
             [
                 'type' => 'text',
                 'text' => $title,
                 'weight' => 'bold',
-                'size' => 'lg',
-                'wrap' => true,
+                'size' => 'xl',
             ],
         ];
 
+        $detailRows = [];
+
+        if ($expiresText) {
+            $detailRows[] = [
+                'type' => 'box',
+                'layout' => 'baseline',
+                'spacing' => 'sm',
+                'contents' => [
+                    ['type' => 'text', 'text' => '有効期限', 'color' => '#aaaaaa', 'size' => 'sm', 'flex' => 2],
+                    ['type' => 'text', 'text' => $expiresText, 'wrap' => true, 'color' => '#666666', 'size' => 'sm', 'flex' => 5],
+                ],
+            ];
+        }
+
         if ($note) {
+            $detailRows[] = [
+                'type' => 'box',
+                'layout' => 'baseline',
+                'spacing' => 'sm',
+                'contents' => [
+                    ['type' => 'text', 'text' => '備考', 'color' => '#aaaaaa', 'size' => 'sm', 'flex' => 2],
+                    ['type' => 'text', 'text' => $note, 'wrap' => true, 'color' => '#666666', 'size' => 'sm', 'flex' => 5],
+                ],
+            ];
+        }
+
+        if (!empty($detailRows)) {
             $bodyContents[] = [
-                'type' => 'text',
-                'text' => $note,
-                'size' => 'sm',
-                'color' => '#888888',
-                'wrap' => true,
-                'margin' => 'md',
+                'type' => 'box',
+                'layout' => 'vertical',
+                'margin' => 'lg',
+                'spacing' => 'sm',
+                'contents' => $detailRows,
             ];
         }
 
@@ -153,6 +177,24 @@ class MessageService
                 'layout' => 'vertical',
                 'contents' => $bodyContents,
             ],
+            'footer' => [
+                'type' => 'box',
+                'layout' => 'vertical',
+                'spacing' => 'sm',
+                'contents' => [
+                    [
+                        'type' => 'button',
+                        'style' => 'link',
+                        'height' => 'sm',
+                        'action' => [
+                            'type' => 'uri',
+                            'label' => 'クーポンを取得する',
+                            'uri' => 'https://line.me/',
+                        ],
+                    ],
+                ],
+                'flex' => 0,
+            ],
         ];
 
         if ($imageUrl) {
@@ -160,7 +202,7 @@ class MessageService
                 'type' => 'image',
                 'url' => $imageUrl,
                 'size' => 'full',
-                'aspectRatio' => '3:1',
+                'aspectRatio' => '7:3',
                 'aspectMode' => 'cover',
             ];
         }

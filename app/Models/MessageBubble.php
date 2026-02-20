@@ -13,6 +13,7 @@ class MessageBubble extends Model
         'bubble_type',
         'text_content',
         'coupon_template_id',
+        'coupon_expires_text',
     ];
 
     public function parent()
