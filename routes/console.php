@@ -12,3 +12,6 @@ Artisan::command('inspire', function () {
 Schedule::command('messages:process-churn')->everyMinute();
 Schedule::command('messages:process-broadcasts')->everyMinute();
 Schedule::command('messages:process-schedules')->everyMinute();
+
+// クーポン有効期限チェック（5分ごと）
+Schedule::command('coupons:expire')->everyFiveMinutes();

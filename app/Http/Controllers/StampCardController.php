@@ -242,7 +242,8 @@ class StampCardController extends Controller
             $checkinCouponResult = $this->processCouponTrigger(
                 $store, $user->id, $lineUserId,
                 $currentCardBeforeUpgrade->checkin_coupon_id,
-                'checkin'
+                'checkin',
+                $currentCardBeforeUpgrade->checkin_coupon_expires_days ?? null
             );
             if ($checkinCouponResult) {
                 if (isset($checkinCouponResult['lottery'])) {
@@ -265,7 +266,8 @@ class StampCardController extends Controller
                 $rankupResult = $this->processCouponTrigger(
                     $store, $user->id, $lineUserId,
                     $upgradedCard->rankup_coupon_id,
-                    'rank_up'
+                    'rank_up',
+                    $upgradedCard->rankup_coupon_expires_days ?? null
                 );
                 if ($rankupResult) {
                     if (isset($rankupResult['lottery'])) {
@@ -292,6 +294,7 @@ class StampCardController extends Controller
                             'store_id' => $store,
                             'user_id' => $user->id,
                             'coupon_template_id' => $tpl->id,
+                            'message_bubble_id' => null,
                             'status' => 'issued',
                             'issued_at' => now(),
                             'used_at' => null,
@@ -354,7 +357,7 @@ class StampCardController extends Controller
     /**
      * クーポンテンプレートに基づいてクーポン付与 or 抽選を実行
      */
-    private function processCouponTrigger(int $storeId, int $userId, string $lineUserId, int $couponTemplateId, string $triggerType): ?array
+    private function processCouponTrigger(int $storeId, int $userId, string $lineUserId, int $couponTemplateId, string $triggerType, ?int $expiresDays = null): ?array
     {
         $tpl = DB::table('coupon_templates')
             ->where('id', $couponTemplateId)
@@ -365,8 +368,10 @@ class StampCardController extends Controller
             return null;
         }
 
+        $expiresAt = $expiresDays ? now()->addDays($expiresDays) : null;
+
         if (($tpl->mode ?? 'normal') === 'lottery') {
-            $result = app(LotteryService::class)->draw($storeId, $userId, $tpl->id, $triggerType);
+            $result = app(LotteryService::class)->draw($storeId, $userId, $tpl->id, $triggerType, $expiresAt);
             return ['lottery' => $result];
         }
 
@@ -375,10 +380,11 @@ class StampCardController extends Controller
             'store_id' => $storeId,
             'user_id' => $userId,
             'coupon_template_id' => $tpl->id,
+            'message_bubble_id' => null,
             'status' => 'issued',
             'issued_at' => now(),
             'used_at' => null,
-            'expires_at' => null,
+            'expires_at' => $expiresAt,
             'created_at' => now(),
             'updated_at' => now(),
         ]);

@@ -116,10 +116,30 @@ class CouponController extends Controller
 
         $now = now();
 
+        // 期限切れチェック
+        $coupon = DB::table('user_coupons')
+            ->where('id', $userCouponId)
+            ->where('store_id', $storeId)
+            ->where('user_id', $user->id)
+            ->first();
+        abort_if(!$coupon, 404, 'coupon not found');
+
+        if ($coupon->expires_at && $now->greaterThan($coupon->expires_at)) {
+            DB::table('user_coupons')
+                ->where('id', $userCouponId)
+                ->update(['status' => 'expired', 'updated_at' => $now]);
+
+            if ($req->expectsJson()) {
+                return response()->json(['ok' => false, 'error' => 'このクーポンは有効期限切れです'], 422);
+            }
+            abort(422, 'このクーポンは有効期限切れです');
+        }
+
         $updated = DB::table('user_coupons')
             ->where('id', $userCouponId)
             ->where('store_id', $storeId)
             ->where('user_id', $user->id)
+            ->where('status', 'issued')
             ->whereNull('used_at')
             ->update([
                 'status' => 'used',

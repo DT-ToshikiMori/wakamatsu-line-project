@@ -99,9 +99,12 @@ class ChurnScenarioResource extends Resource
                                 })
                                 ->visible(fn ($get) => $get('bubble_type') === 'coupon'),
 
-                            Forms\Components\TextInput::make('coupon_expires_text')
-                                ->label('有効期限（表示テキスト）')
-                                ->placeholder('例: 2026年3月31日まで')
+                            Forms\Components\TextInput::make('coupon_expires_days')
+                                ->label('有効期限（配信からX日後）')
+                                ->numeric()
+                                ->minValue(1)
+                                ->placeholder('例: 14')
+                                ->helperText('配信日からこの日数後にクーポンが失効します')
                                 ->live(onBlur: true)
                                 ->visible(fn ($get) => $get('bubble_type') === 'coupon'),
 

@@ -11,7 +11,7 @@ class LotteryService
      *
      * @return array{is_win: bool, prize: object, user_coupon_id: int|null, prizes: array}
      */
-    public function draw(int $storeId, int $userId, int $couponTemplateId, string $triggerType): array
+    public function draw(int $storeId, int $userId, int $couponTemplateId, string $triggerType, ?\Carbon\Carbon $expiresAt = null): array
     {
         $prizes = DB::table('lottery_prizes')
             ->where('coupon_template_id', $couponTemplateId)
@@ -38,7 +38,7 @@ class LotteryService
                 'status' => 'issued',
                 'issued_at' => $now,
                 'used_at' => null,
-                'expires_at' => null,
+                'expires_at' => $expiresAt,
                 'created_at' => $now,
                 'updated_at' => $now,
             ]);

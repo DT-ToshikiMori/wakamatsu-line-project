@@ -8,20 +8,15 @@ use Illuminate\Support\Facades\Log;
 class MessageService
 {
     protected LineBotService $lineBotService;
-    protected LotteryService $lotteryService;
 
-    public function __construct(LineBotService $lineBotService, LotteryService $lotteryService)
+    public function __construct(LineBotService $lineBotService)
     {
         $this->lineBotService = $lineBotService;
-        $this->lotteryService = $lotteryService;
     }
 
     /**
      * バブル配列を元にユーザーへメッセージ送信
-     *
-     * @param int $userId users.id
-     * @param array $bubbles message_bubbles のレコード配列
-     * @param string $triggerType 'inactive' or 'manual'
+     * クーポンは通知のみ送信（発行はユーザーの「取得」アクション時）
      */
     public function sendToUser(int $userId, array $bubbles, string $triggerType = 'manual'): void
     {
@@ -36,7 +31,7 @@ class MessageService
                 if ($bubble->bubble_type === 'text') {
                     $this->sendTextBubble($user, $bubble);
                 } elseif ($bubble->bubble_type === 'coupon') {
-                    $this->sendCouponBubble($user, $bubble, $triggerType);
+                    $this->sendCouponBubble($user, $bubble);
                 }
             } catch (\Throwable $e) {
                 Log::error('MessageService: bubble send failed', [
@@ -57,7 +52,7 @@ class MessageService
         $this->lineBotService->pushText($user->line_user_id, $bubble->text_content);
     }
 
-    private function sendCouponBubble(object $user, object $bubble, string $triggerType): void
+    private function sendCouponBubble(object $user, object $bubble): void
     {
         if (empty($bubble->coupon_template_id)) {
             return;
@@ -72,58 +67,41 @@ class MessageService
             return;
         }
 
-        $now = now();
+        $expiresText = $this->buildExpiresText($bubble);
 
-        if (($tpl->mode ?? 'normal') === 'lottery') {
-            // 抽選実行
-            $result = $this->lotteryService->draw($user->store_id, $user->id, $tpl->id, $triggerType);
+        $postbackData = http_build_query([
+            'action' => 'claim_coupon',
+            'bubble_id' => $bubble->id,
+            'tpl_id' => $tpl->id,
+            'sent_at' => now()->timestamp,
+        ]);
 
-            if ($result['is_win']) {
-                $prize = $result['prize'];
-                $this->lineBotService->pushFlexMessage(
-                    $user->line_user_id,
-                    "抽選結果: {$prize['title']}",
-                    $this->buildCouponFlexContents("🎉 当選！{$prize['title']}", $tpl->note ?? '', $prize['image_url'] ?? $tpl->image_url)
-                );
-            } else {
-                $this->lineBotService->pushText(
-                    $user->line_user_id,
-                    "抽選の結果...残念！ハズレでした。また挑戦してね！"
-                );
-            }
-        } else {
-            // 通常クーポン付与
-            $userCouponId = DB::table('user_coupons')->insertGetId([
-                'store_id' => $user->store_id,
-                'user_id' => $user->id,
-                'coupon_template_id' => $tpl->id,
-                'status' => 'issued',
-                'issued_at' => $now,
-                'used_at' => null,
-                'expires_at' => null,
-                'created_at' => $now,
-                'updated_at' => $now,
-            ]);
-
-            DB::table('coupon_events')->insert([
-                'user_coupon_id' => $userCouponId,
-                'event' => 'issued',
-                'actor' => 'system',
-                'created_at' => $now,
-            ]);
-
-            $this->lineBotService->pushFlexMessage(
-                $user->line_user_id,
-                "クーポン: {$tpl->title}",
-                $this->buildCouponFlexContents($tpl->title, $tpl->note ?? '', $tpl->image_url, $bubble->coupon_expires_text ?? null)
-            );
-        }
+        $this->lineBotService->pushFlexMessage(
+            $user->line_user_id,
+            "クーポン: {$tpl->title}",
+            $this->buildCouponFlexContents($tpl->title, $tpl->note ?? '', $tpl->image_url, $expiresText, $postbackData)
+        );
     }
 
-    /**
-     * クーポン通知用 Flex Message の contents を組み立て
-     */
-    private function buildCouponFlexContents(string $title, string $note, ?string $imageUrl, ?string $expiresText = null): array
+    private function buildExpiresText(object $bubble): ?string
+    {
+        if (!empty($bubble->coupon_expires_at)) {
+            $dt = \Carbon\Carbon::parse($bubble->coupon_expires_at);
+            return $dt->format('Y年n月j日 H:i') . ' まで';
+        }
+
+        if (!empty($bubble->coupon_expires_days)) {
+            return "取得から{$bubble->coupon_expires_days}日間有効";
+        }
+
+        if (!empty($bubble->coupon_expires_text)) {
+            return $bubble->coupon_expires_text;
+        }
+
+        return null;
+    }
+
+    private function buildCouponFlexContents(string $title, string $note, ?string $imageUrl, ?string $expiresText = null, ?string $postbackData = null): array
     {
         $bodyContents = [
             [
@@ -170,6 +148,19 @@ class MessageService
             ];
         }
 
+        $buttonAction = $postbackData
+            ? [
+                'type' => 'postback',
+                'label' => 'クーポンを取得する',
+                'data' => $postbackData,
+                'displayText' => 'クーポンを取得する',
+            ]
+            : [
+                'type' => 'uri',
+                'label' => 'クーポンを見る',
+                'uri' => 'https://line.me/',
+            ];
+
         $bubble = [
             'type' => 'bubble',
             'body' => [
@@ -186,11 +177,7 @@ class MessageService
                         'type' => 'button',
                         'style' => 'link',
                         'height' => 'sm',
-                        'action' => [
-                            'type' => 'uri',
-                            'label' => 'クーポンを取得する',
-                            'uri' => 'https://line.me/',
-                        ],
+                        'action' => $buttonAction,
                     ],
                 ],
                 'flex' => 0,

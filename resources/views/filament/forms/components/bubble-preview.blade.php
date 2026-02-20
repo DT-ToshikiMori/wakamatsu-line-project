@@ -37,7 +37,7 @@
                             <div style="font-weight: bold; font-size: 13px; color: #111111; margin-bottom: 8px;" x-text="bubble.coupon_template_title || 'クーポン'"></div>
                             <div style="display: flex; gap: 6px; font-size: 10px; margin-bottom: 3px; line-height: 1.4;">
                                 <span style="color: #aaaaaa; flex-shrink: 0;">有効期限</span>
-                                <span style="color: #666666;" x-text="bubble.coupon_expires_text || '未設定'"></span>
+                                <span style="color: #666666;" x-text="bubble.coupon_expires_at ? bubble.coupon_expires_at : (bubble.coupon_expires_days ? '配信から' + bubble.coupon_expires_days + '日間有効' : '未設定')"></span>
                             </div>
                             <template x-if="bubble.coupon_template_note">
                                 <div style="display: flex; gap: 6px; font-size: 10px; line-height: 1.4;">

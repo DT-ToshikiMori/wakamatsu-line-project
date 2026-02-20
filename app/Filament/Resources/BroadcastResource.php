@@ -10,6 +10,7 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Support\Facades\DB;
 
 class BroadcastResource extends Resource
 {
@@ -113,9 +114,9 @@ class BroadcastResource extends Resource
                                 })
                                 ->visible(fn ($get) => $get('bubble_type') === 'coupon'),
 
-                            Forms\Components\TextInput::make('coupon_expires_text')
-                                ->label('有効期限（表示テキスト）')
-                                ->placeholder('例: 2026年3月31日まで')
+                            Forms\Components\DateTimePicker::make('coupon_expires_at')
+                                ->label('有効期限（日時）')
+                                ->helperText('この日時を過ぎるとクーポンは失効します')
                                 ->live(onBlur: true)
                                 ->visible(fn ($get) => $get('bubble_type') === 'coupon'),
 
@@ -164,6 +165,26 @@ class BroadcastResource extends Resource
                     }),
                 Tables\Columns\TextColumn::make('scheduled_at')->label('配信予定')->dateTime('Y-m-d H:i')->sortable(),
                 Tables\Columns\TextColumn::make('sent_count')->label('配信数')->sortable(),
+                Tables\Columns\TextColumn::make('claim_rate')
+                    ->label('取得率')
+                    ->getStateUsing(function (Broadcast $record) {
+                        if ($record->sent_count <= 0 || $record->status !== 'sent') {
+                            return '-';
+                        }
+                        $bubbleIds = DB::table('message_bubbles')
+                            ->where('parent_type', 'broadcast')
+                            ->where('parent_id', $record->id)
+                            ->where('bubble_type', 'coupon')
+                            ->pluck('id');
+                        if ($bubbleIds->isEmpty()) {
+                            return '-';
+                        }
+                        $claimed = DB::table('user_coupons')
+                            ->whereIn('message_bubble_id', $bubbleIds)
+                            ->count();
+                        $rate = round(($claimed / $record->sent_count) * 100, 1);
+                        return "{$claimed}/{$record->sent_count} ({$rate}%)";
+                    }),
             ])
             ->defaultSort('updated_at', 'desc')
             ->actions([

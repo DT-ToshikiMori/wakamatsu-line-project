@@ -14,6 +14,12 @@ class MessageBubble extends Model
         'text_content',
         'coupon_template_id',
         'coupon_expires_text',
+        'coupon_expires_at',
+        'coupon_expires_days',
+    ];
+
+    protected $casts = [
+        'coupon_expires_at' => 'datetime',
     ];
 
     public function parent()

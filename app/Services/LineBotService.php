@@ -39,6 +39,42 @@ class LineBotService
     }
 
     /**
+     * テキストメッセージをリプライ送信（replyToken使用）
+     */
+    public function replyText(string $replyToken, string $text): bool
+    {
+        if (empty($this->accessToken)) {
+            Log::warning('LineBotService: LINE_BOT_CHANNEL_ACCESS_TOKEN is not configured');
+            return false;
+        }
+
+        try {
+            $response = Http::withToken($this->accessToken)
+                ->post('https://api.line.me/v2/bot/message/reply', [
+                    'replyToken' => $replyToken,
+                    'messages' => [
+                        ['type' => 'text', 'text' => $text],
+                    ],
+                ]);
+
+            if (!$response->successful()) {
+                Log::warning('LineBotService: reply failed', [
+                    'status' => $response->status(),
+                    'body' => $response->body(),
+                ]);
+                return false;
+            }
+
+            return true;
+        } catch (\Throwable $e) {
+            Log::error('LineBotService: exception during reply', [
+                'message' => $e->getMessage(),
+            ]);
+            return false;
+        }
+    }
+
+    /**
      * メッセージをプッシュ送信（共通）
      */
     protected function push(string $userId, array $messages): bool

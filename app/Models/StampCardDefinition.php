@@ -17,7 +17,9 @@ class StampCardDefinition extends Model
         'theme_logo_opacity',
         'is_active',
         'rankup_coupon_id',
+        'rankup_coupon_expires_days',
         'checkin_coupon_id',
+        'checkin_coupon_expires_days',
     ];
 
     public function store()

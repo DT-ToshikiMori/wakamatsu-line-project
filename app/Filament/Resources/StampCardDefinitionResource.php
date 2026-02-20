@@ -74,14 +74,34 @@ class StampCardDefinitionResource extends Resource
                 ->relationship('rankupCoupon', 'title')
                 ->searchable()
                 ->nullable()
+                ->live()
                 ->helperText('このランクに昇格した時に配布するクーポン'),
+
+            Forms\Components\TextInput::make('rankup_coupon_expires_days')
+                ->label('ランクアップクーポン有効日数')
+                ->numeric()
+                ->minValue(1)
+                ->nullable()
+                ->placeholder('例: 30')
+                ->helperText('発行からX日後に失効（未設定=無期限）')
+                ->visible(fn ($get) => !empty($get('rankup_coupon_id'))),
 
             Forms\Components\Select::make('checkin_coupon_id')
                 ->label('チェックイン時クーポン')
                 ->relationship('checkinCoupon', 'title')
                 ->searchable()
                 ->nullable()
+                ->live()
                 ->helperText('このランクでチェックインした時に配布するクーポン（任意）'),
+
+            Forms\Components\TextInput::make('checkin_coupon_expires_days')
+                ->label('チェックインクーポン有効日数')
+                ->numeric()
+                ->minValue(1)
+                ->nullable()
+                ->placeholder('例: 7')
+                ->helperText('発行からX日後に失効（未設定=無期限）')
+                ->visible(fn ($get) => !empty($get('checkin_coupon_id'))),
         ]);
     }
 
