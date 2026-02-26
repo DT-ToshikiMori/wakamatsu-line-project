@@ -16,7 +16,7 @@ for var in "${env_vars[@]}"; do
 done
 
 # ストレージディレクトリ作成・権限
-mkdir -p storage/app/public/coupon-images storage/app/livewire-tmp storage/framework/sessions storage/framework/cache storage/framework/views storage/logs
+mkdir -p storage/app/public/coupon-images storage/app/public/livewire-tmp storage/framework/sessions storage/framework/cache storage/framework/views storage/logs
 chmod -R 775 storage bootstrap/cache
 
 php artisan migrate --force 2>/dev/null || true
