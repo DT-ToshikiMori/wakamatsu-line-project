@@ -1,14 +1,5 @@
 <x-filament-widgets::widget>
   <x-filament::section heading="属性分析">
-    {{-- Chart.js CDN（Filament内部のChart.jsがグローバルに見えない場合の保険） --}}
-    <script>
-      if (typeof window.Chart === 'undefined') {
-        var s = document.createElement('script');
-        s.src = 'https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js';
-        document.head.appendChild(s);
-      }
-    </script>
-
     <div
       x-data="{
         charts: [],
@@ -17,15 +8,26 @@
         birthMonthData: @js($birthMonthData),
         visitData: @js($visitData),
         lastVisitData: @js($lastVisitData),
-        retryCount: 0,
-        initCharts() {
-          if (typeof window.Chart === 'undefined') {
-            if (this.retryCount < 30) {
-              this.retryCount++;
-              setTimeout(() => this.initCharts(), 200);
+
+        loadChartJs() {
+          return new Promise((resolve) => {
+            if (typeof window.Chart !== 'undefined') {
+              resolve();
+              return;
             }
-            return;
-          }
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js';
+            script.onload = () => resolve();
+            script.onerror = () => resolve();
+            document.head.appendChild(script);
+          });
+        },
+
+        async initCharts() {
+          await this.loadChartJs();
+
+          if (typeof window.Chart === 'undefined') return;
+
           this.$nextTick(() => {
             this.renderDoughnut(this.$refs.genderChart, this.genderData);
             this.renderDoughnut(this.$refs.rankChart, this.rankData);
@@ -34,6 +36,7 @@
             this.renderBar(this.$refs.lastVisitChart, this.lastVisitData, null, true);
           });
         },
+
         renderDoughnut(canvas, data) {
           if (!canvas) return;
           this.charts.push(new Chart(canvas, {
@@ -55,6 +58,7 @@
             }
           }));
         },
+
         renderBar(canvas, data, color, horizontal) {
           if (!canvas) return;
           const bgColors = data.colors || data.values.map(() => color);
@@ -82,14 +86,9 @@
               }
             }
           }));
-        },
-        destroyCharts() {
-          this.charts.forEach(c => c.destroy());
-          this.charts = [];
         }
       }"
       x-init="initCharts()"
-      x-on:beforeunmount.window="destroyCharts()"
     >
       {{-- 2列グリッド: ドーナツ2つ --}}
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
