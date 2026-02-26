@@ -63,6 +63,18 @@ return new class extends Migration
                     ->update(['user_id' => $keep->id]);
             }
 
+            if (Schema::hasTable('broadcast_logs')) {
+                DB::table('broadcast_logs')
+                    ->whereIn('user_id', $otherIds)
+                    ->update(['user_id' => $keep->id]);
+            }
+
+            if (Schema::hasTable('message_schedules')) {
+                DB::table('message_schedules')
+                    ->whereIn('user_id', $otherIds)
+                    ->update(['user_id' => $keep->id]);
+            }
+
             // 重複行を削除
             DB::table('users')->whereIn('id', $otherIds)->delete();
         }

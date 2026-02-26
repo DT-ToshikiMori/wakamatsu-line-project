@@ -30,10 +30,18 @@ return new class extends Migration
             $keep = $rows->first();
             $otherIds = $rows->slice(1)->pluck('id')->all();
 
-            // current_card_id が削除される定義を指している users を残す定義に付け替え
+            // 削除される定義を参照しているレコードを残す定義に付け替え
             DB::table('users')
                 ->whereIn('current_card_id', $otherIds)
                 ->update(['current_card_id' => $keep->id]);
+
+            DB::table('coupon_templates')
+                ->whereIn('rank_card_id', $otherIds)
+                ->update(['rank_card_id' => $keep->id]);
+
+            DB::table('broadcasts')
+                ->whereIn('filter_rank_card_id', $otherIds)
+                ->update(['filter_rank_card_id' => $keep->id]);
 
             DB::table('stamp_card_definitions')->whereIn('id', $otherIds)->delete();
         }
