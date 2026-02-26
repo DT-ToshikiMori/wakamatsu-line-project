@@ -116,15 +116,11 @@ class LineWebhookController extends Controller
         $tplId = (int) ($params['tpl_id'] ?? 0);
         $sentAt = (int) ($params['sent_at'] ?? 0);
 
-        $user = DB::table('users')->where('line_user_id', $lineUserId)->first();
-        $storeId = $user->store_id ?? 0;
-
         $liffId = config('services.line.liff_id');
         $claimUrl = "https://liff.line.me/{$liffId}/coupons/claim?" . http_build_query([
             'bubble_id' => $bubbleId,
             'tpl_id' => $tplId,
             'sent_at' => $sentAt,
-            'store' => $storeId,
         ]);
 
         $this->lineBotService->replyText(

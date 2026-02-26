@@ -27,10 +27,11 @@ class BroadcastResource extends Resource
     {
         return $form->schema([
             Forms\Components\Select::make('store_id')
-                ->label('店舗')
+                ->label('店舗（任意）')
                 ->relationship('store', 'name')
                 ->searchable()
-                ->required(),
+                ->nullable()
+                ->helperText('未選択の場合、全ユーザーが対象'),
 
             Forms\Components\TextInput::make('name')
                 ->label('配信名')

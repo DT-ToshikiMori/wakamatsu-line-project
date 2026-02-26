@@ -23,12 +23,6 @@ class StampCardDefinitionResource extends Resource
     public static function form(Form $form): Form
     {
         return $form->schema([
-            Forms\Components\Select::make('store_id')
-                ->label('店舗')
-                ->relationship('store', 'name')
-                ->searchable()
-                ->required(),
-
             Forms\Components\TextInput::make('name')
                 ->label('識別名（BEGINNERなど）')
                 ->required()
@@ -109,7 +103,6 @@ class StampCardDefinitionResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('store.name')->label('店舗')->sortable()->searchable(),
                 Tables\Columns\TextColumn::make('priority')->label('順序')->sortable(),
                 Tables\Columns\TextColumn::make('name')->label('識別名')->searchable(),
                 Tables\Columns\TextColumn::make('display_name')->label('表示名')->searchable(),

@@ -14,23 +14,18 @@ class CouponController extends Controller
      */
     public function index(Request $req)
     {
-        $storeId = (int) $req->query('store', 0);
-        abort_if($storeId <= 0, 400, 'store is required');
-
         $lineUserId = $req->attributes->get('line_user_id');
         if (!$lineUserId) {
             return response()->view('liff-auth');
         }
 
         $user = DB::table('users')
-            ->where('store_id', $storeId)
             ->where('line_user_id', $lineUserId)
             ->first();
         abort_if(!$user, 404, 'user not found');
 
         $coupons = DB::table('user_coupons as uc')
             ->join('coupon_templates as ct', 'ct.id', '=', 'uc.coupon_template_id')
-            ->where('uc.store_id', $storeId)
             ->where('uc.user_id', $user->id)
             ->select([
                 'uc.id as user_coupon_id',
@@ -48,7 +43,7 @@ class CouponController extends Controller
             ->get();
 
         return view('coupons.index', [
-            'storeId' => $storeId,
+            'storeId' => (int) $req->query('store', 0),
             'coupons' => $coupons,
         ]);
     }
@@ -58,16 +53,12 @@ class CouponController extends Controller
      */
     public function show(Request $req, int $userCouponId)
     {
-        $storeId = (int) $req->query('store', 0);
-        abort_if($storeId <= 0, 400, 'store is required');
-
         $lineUserId = $req->attributes->get('line_user_id');
         if (!$lineUserId) {
             return response()->view('liff-auth');
         }
 
         $user = DB::table('users')
-            ->where('store_id', $storeId)
             ->where('line_user_id', $lineUserId)
             ->first();
         abort_if(!$user, 404, 'user not found');
@@ -75,7 +66,6 @@ class CouponController extends Controller
         $coupon = DB::table('user_coupons as uc')
             ->join('coupon_templates as ct', 'ct.id', '=', 'uc.coupon_template_id')
             ->where('uc.id', $userCouponId)
-            ->where('uc.store_id', $storeId)
             ->where('uc.user_id', $user->id)
             ->select([
                 'uc.id as user_coupon_id',
@@ -92,7 +82,7 @@ class CouponController extends Controller
         abort_if(!$coupon, 404, 'coupon not found');
 
         return view('coupons.show', [
-            'storeId' => $storeId,
+            'storeId' => (int) $req->query('store', 0),
             'coupon' => $coupon,
             'isUsed' => !empty($coupon->used_at) || $coupon->status === 'used',
             'usedAt' => $coupon->used_at,
@@ -104,12 +94,11 @@ class CouponController extends Controller
      */
     public function claimPage(Request $req)
     {
-        $storeId = (int) $req->query('store', 0);
         $bubbleId = (int) $req->query('bubble_id', 0);
         $tplId = (int) $req->query('tpl_id', 0);
         $sentAt = (int) $req->query('sent_at', 0);
 
-        abort_if($storeId <= 0 || !$bubbleId || !$tplId, 400, 'パラメータが不正です');
+        abort_if(!$bubbleId || !$tplId, 400, 'パラメータが不正です');
 
         $lineUserId = $req->attributes->get('line_user_id');
         if (!$lineUserId) {
@@ -117,7 +106,6 @@ class CouponController extends Controller
         }
 
         $user = DB::table('users')
-            ->where('store_id', $storeId)
             ->where('line_user_id', $lineUserId)
             ->first();
         abort_if(!$user, 404, 'user not found');
@@ -142,7 +130,7 @@ class CouponController extends Controller
         $isExpired = $expiresAt && $expiresAt->isPast();
 
         return view('coupons.claim', [
-            'storeId' => $storeId,
+            'storeId' => (int) $req->query('store', 0),
             'bubbleId' => $bubbleId,
             'tplId' => $tplId,
             'sentAt' => $sentAt,
@@ -159,18 +147,16 @@ class CouponController extends Controller
      */
     public function claim(Request $req)
     {
-        $storeId = (int) $req->input('store', 0);
         $bubbleId = (int) $req->input('bubble_id', 0);
         $tplId = (int) $req->input('tpl_id', 0);
         $sentAt = (int) $req->input('sent_at', 0);
 
-        abort_if($storeId <= 0 || !$bubbleId || !$tplId, 400, 'パラメータが不正です');
+        abort_if(!$bubbleId || !$tplId, 400, 'パラメータが不正です');
 
         $lineUserId = $req->attributes->get('line_user_id');
         abort_if(!$lineUserId, 401, 'LIFF認証が必要です');
 
         $user = DB::table('users')
-            ->where('store_id', $storeId)
             ->where('line_user_id', $lineUserId)
             ->first();
         abort_if(!$user, 404, 'user not found');
@@ -204,7 +190,7 @@ class CouponController extends Controller
 
         // 抽選モード
         if (($tpl->mode ?? 'normal') === 'lottery') {
-            $result = app(LotteryService::class)->draw($user->store_id, $user->id, $tpl->id, 'manual', $expiresAt);
+            $result = app(LotteryService::class)->draw(null, $user->id, $tpl->id, 'manual', $expiresAt);
 
             if ($result['is_win'] && $result['user_coupon_id']) {
                 DB::table('user_coupons')
@@ -212,7 +198,7 @@ class CouponController extends Controller
                     ->update(['message_bubble_id' => $bubbleId, 'expires_at' => $expiresAt]);
             } else {
                 DB::table('user_coupons')->insert([
-                    'store_id' => $user->store_id,
+                    'store_id' => null,
                     'user_id' => $user->id,
                     'coupon_template_id' => $tpl->id,
                     'message_bubble_id' => $bubbleId,
@@ -237,7 +223,7 @@ class CouponController extends Controller
         // 通常クーポン取得
         try {
             $userCouponId = DB::table('user_coupons')->insertGetId([
-                'store_id' => $user->store_id,
+                'store_id' => null,
                 'user_id' => $user->id,
                 'coupon_template_id' => $tpl->id,
                 'message_bubble_id' => $bubbleId,
@@ -285,14 +271,10 @@ class CouponController extends Controller
      */
     public function use(Request $req, int $userCouponId)
     {
-        $storeId = (int) $req->input('store', 0);
-        abort_if($storeId <= 0, 400, 'store is required');
-
         $lineUserId = $req->attributes->get('line_user_id');
         abort_if(!$lineUserId, 401, 'LIFF認証が必要です');
 
         $user = DB::table('users')
-            ->where('store_id', $storeId)
             ->where('line_user_id', $lineUserId)
             ->first();
         abort_if(!$user, 404, 'user not found');
@@ -302,7 +284,6 @@ class CouponController extends Controller
         // 期限切れチェック
         $coupon = DB::table('user_coupons')
             ->where('id', $userCouponId)
-            ->where('store_id', $storeId)
             ->where('user_id', $user->id)
             ->first();
         abort_if(!$coupon, 404, 'coupon not found');
@@ -320,7 +301,6 @@ class CouponController extends Controller
 
         $updated = DB::table('user_coupons')
             ->where('id', $userCouponId)
-            ->where('store_id', $storeId)
             ->where('user_id', $user->id)
             ->where('status', 'issued')
             ->whereNull('used_at')
@@ -329,6 +309,8 @@ class CouponController extends Controller
                 'used_at' => $now,
                 'updated_at' => $now,
             ]);
+
+        $storeId = (int) $req->input('store', 0);
 
         if ($req->expectsJson()) {
             return response()->json([

@@ -7,7 +7,6 @@ use Illuminate\Database\Eloquent\Model;
 class StampCardDefinition extends Model
 {
     protected $fillable = [
-        'store_id',
         'name',
         'display_name',
         'required_stamps',

@@ -25,7 +25,7 @@ Route::get('/admin/users', function (Request $req) {
     $daysGte = $req->integer('days_gte');
 
     $q = DB::table('users')
-        ->join('stores', 'stores.id', '=', 'users.store_id')
+        ->leftJoin('stores', 'stores.id', '=', 'users.store_id')
         ->select('users.*', 'stores.name as store_name')
         ->orderByDesc('users.last_visit_at');
 
@@ -57,7 +57,8 @@ Route::get('/r/{slug}', function (Request $req, string $slug) {
 
     if ($liffId) {
         // LIFF URLへリダイレクト（LINEアプリ内で開く）
-        $path = urlencode("/s/{$storeId}/card");
+        // QRリンクIDも渡して stamp_count を参照できるようにする
+        $path = urlencode("/s/{$storeId}/card?qr_link_id={$link->id}");
         return redirect("https://liff.line.me/{$liffId}?path={$path}");
     }
 

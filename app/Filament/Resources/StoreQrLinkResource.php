@@ -51,6 +51,14 @@ class StoreQrLinkResource extends Resource
                 ->maxLength(2000)
                 ->helperText('LINEのスタンプ付与URL（u.lin.ee など）'),
 
+            Forms\Components\TextInput::make('stamp_count')
+                ->label('スタンプ付与数')
+                ->numeric()
+                ->default(1)
+                ->minValue(1)
+                ->required()
+                ->helperText('このQRコードで付与するスタンプ数'),
+
             Forms\Components\Toggle::make('is_active')
                 ->label('有効')
                 ->default(true),
@@ -82,6 +90,10 @@ class StoreQrLinkResource extends Resource
                     ->label('リダイレクトURL')
                     ->limit(30)
                     ->copyable(),
+
+                Tables\Columns\TextColumn::make('stamp_count')
+                    ->label('スタンプ数')
+                    ->sortable(),
 
                 Tables\Columns\IconColumn::make('is_active')
                     ->label('有効')

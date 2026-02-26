@@ -54,9 +54,8 @@ class ProcessBroadcasts extends Command
             return;
         }
 
-        // 対象ユーザー抽出
+        // 対象ユーザー抽出（全ユーザー対象）
         $query = DB::table('users')
-            ->where('store_id', $broadcast->store_id)
             ->whereNotNull('line_user_id');
 
         if ($broadcast->filter_type === 'filtered') {

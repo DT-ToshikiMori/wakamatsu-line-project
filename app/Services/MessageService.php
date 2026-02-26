@@ -75,7 +75,6 @@ class MessageService
             'bubble_id' => $bubble->id,
             'tpl_id' => $tpl->id,
             'sent_at' => now()->timestamp,
-            'store' => $user->store_id,
         ]);
 
         $this->lineBotService->pushFlexMessage(

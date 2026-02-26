@@ -25,11 +25,11 @@ class StampCardController extends Controller
         $storeRow = DB::table('stores')->where('id', $store)->first();
         abort_if(!$storeRow, 404, 'store not found');
 
-        // users upsert（店舗×LINEユーザー）
-        $user = DB::table('users')->where('store_id', $store)->where('line_user_id', $lineUserId)->first();
+        // users upsert（line_user_id でグローバル一意）
+        $user = DB::table('users')->where('line_user_id', $lineUserId)->first();
         if (!$user) {
             $userId = DB::table('users')->insertGetId([
-                'store_id' => $store,
+                'store_id' => null,
                 'line_user_id' => $lineUserId,
                 'display_name' => $displayName,
                 'profile_image_url' => $picture,
@@ -60,13 +60,12 @@ class StampCardController extends Controller
             }
         }
 
-        // ① 店舗のランク定義（priority順）
+        // ① ランク定義（グローバル、priority順）
         $cards = DB::table('stamp_card_definitions')
-            ->where('store_id', $store)
             ->where('is_active', true)
             ->orderBy('priority')
             ->get();
-        abort_if($cards->isEmpty(), 500, 'stamp_card_definitions is empty for this store');
+        abort_if($cards->isEmpty(), 500, 'stamp_card_definitions is empty');
 
         // ② 初回ユーザーは最初のカードに入れる
         if (!$user->current_card_id) {
@@ -140,37 +139,44 @@ class StampCardController extends Controller
         abort_if(!$lineUserId, 401, 'LIFF認証が必要です');
 
         $user = DB::table('users')
-            ->where('store_id', $store)
             ->where('line_user_id', $lineUserId)
             ->first();
         abort_if(!$user, 404, 'user not found');
 
+        // QRリンクから stamp_count を取得（デフォルト1）
+        $stampCount = 1;
+        $qrLinkId = $req->input('qr_link_id');
+        $qrLink = null;
+        if ($qrLinkId) {
+            $qrLink = DB::table('store_qr_links')->where('id', $qrLinkId)->first();
+            if ($qrLink) {
+                $stampCount = (int) ($qrLink->stamp_count ?? 1);
+            }
+        }
+
         $visitedAt = now();
         $requestId = 'card_' . bin2hex(random_bytes(8));
 
-        $upgraded = false;
-        $upgradedToCardId = null;
-        $upgradedToDisplayName = null;
+        $rankUpResults = [];
         $issuedCoupon = null;
         $lotteryResult = null;
         $currentCardBeforeUpgrade = null;
 
-        DB::transaction(function () use ($store, $user, $visitedAt, $requestId, &$upgraded, &$upgradedToCardId, &$upgradedToDisplayName, &$currentCardBeforeUpgrade) {
+        DB::transaction(function () use ($store, $user, $visitedAt, $requestId, $stampCount, $qrLinkId, &$rankUpResults, &$currentCardBeforeUpgrade) {
 
-            // ① visit log
+            // ① visit log（店舗スコープ維持）
             DB::table('visits')->insert([
                 'store_id' => $store,
                 'user_id' => $user->id,
-                'qr_link_id' => null,
+                'qr_link_id' => $qrLinkId,
                 'visited_at' => $visitedAt,
                 'request_id' => $requestId,
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
 
-            // ② ランク定義を取得（priority順）
+            // ② ランク定義を取得（グローバル、priority順）
             $cards = DB::table('stamp_card_definitions')
-                ->where('store_id', $store)
                 ->where('is_active', true)
                 ->orderBy('priority')
                 ->get();
@@ -190,40 +196,38 @@ class StampCardController extends Controller
             $currentCard = $cards->firstWhere('id', $user->current_card_id);
             $currentCardBeforeUpgrade = $currentCard;
 
-            $nextStampTotal = ($user->stamp_total ?? 0) + 1;
-            $nextProgress = ($user->card_progress ?? 0) + 1;
+            $nextStampTotal = ($user->stamp_total ?? 0) + $stampCount;
+            $nextProgress = ($user->card_progress ?? 0) + $stampCount;
 
-            // ④ ランクアップ判定
-            if ($nextProgress >= $currentCard->required_stamps) {
+            // ④ マルチランクアップ対応: stamp_count が2以上の場合、複数ランクを一気に上がる可能性
+            $activeCard = $currentCard;
+            $remainingProgress = $nextProgress;
 
-                $nextCard = $cards->firstWhere(
-                    'priority',
-                    $currentCard->priority + 1
-                );
+            while ($activeCard && $remainingProgress >= $activeCard->required_stamps) {
+                $nextCard = $cards->firstWhere('priority', $activeCard->priority + 1);
 
                 if ($nextCard) {
-                    DB::table('users')->where('id', $user->id)->update([
-                        'stamp_total' => $nextStampTotal,
-                        'current_card_id' => $nextCard->id,
-                        'card_progress' => 0,
-                        'card_updated_at' => $visitedAt,
-                    ]);
-                    $upgraded = true;
-                    $upgradedToCardId = $nextCard->id;
-                    $upgradedToDisplayName = $nextCard->display_name ?? $nextCard->name ?? 'RANK UP';
+                    // ランクアップ記録
+                    $rankUpResults[] = [
+                        'from_card' => $activeCard,
+                        'to_card' => $nextCard,
+                    ];
+                    $remainingProgress = $remainingProgress - $activeCard->required_stamps;
+                    $activeCard = $nextCard;
                 } else {
-                    DB::table('users')->where('id', $user->id)->update([
-                        'stamp_total' => $nextStampTotal,
-                        'card_progress' => 0,
-                    ]);
+                    // 最高ランク: プログレスをリセット
+                    $remainingProgress = 0;
+                    break;
                 }
-
-            } else {
-                DB::table('users')->where('id', $user->id)->update([
-                    'stamp_total' => $nextStampTotal,
-                    'card_progress' => $nextProgress,
-                ]);
             }
+
+            // ユーザー更新
+            DB::table('users')->where('id', $user->id)->update([
+                'stamp_total' => $nextStampTotal,
+                'current_card_id' => $activeCard->id,
+                'card_progress' => $remainingProgress,
+                'card_updated_at' => $visitedAt,
+            ]);
 
             // ⑤ visit系
             DB::table('users')->where('id', $user->id)->update([
@@ -240,7 +244,7 @@ class StampCardController extends Controller
         // チェックイン時クーポン処理（currentCard の checkin_coupon_id）
         if ($currentCardBeforeUpgrade && !empty($currentCardBeforeUpgrade->checkin_coupon_id)) {
             $checkinCouponResult = $this->processCouponTrigger(
-                $store, $user->id, $lineUserId,
+                null, $user->id, $lineUserId,
                 $currentCardBeforeUpgrade->checkin_coupon_id,
                 'checkin',
                 $currentCardBeforeUpgrade->checkin_coupon_expires_days ?? null
@@ -254,20 +258,18 @@ class StampCardController extends Controller
             }
         }
 
-        // ランクアップ時クーポン処理
-        if ($upgraded && $upgradedToCardId) {
-            // 新しいランクの定義を取得して rankup_coupon_id を確認
-            $upgradedCard = DB::table('stamp_card_definitions')
-                ->where('id', $upgradedToCardId)
-                ->first();
+        // マルチランクアップ時クーポン処理: 各ランクアップごとにクーポン発行
+        $upgradedToDisplayName = null;
+        foreach ($rankUpResults as $rankUp) {
+            $toCard = $rankUp['to_card'];
+            $upgradedToDisplayName = $toCard->display_name ?? $toCard->name ?? 'RANK UP';
 
-            if ($upgradedCard && !empty($upgradedCard->rankup_coupon_id)) {
-                // stamp_card_definitions.rankup_coupon_id を使う（新方式）
+            if (!empty($toCard->rankup_coupon_id)) {
                 $rankupResult = $this->processCouponTrigger(
-                    $store, $user->id, $lineUserId,
-                    $upgradedCard->rankup_coupon_id,
+                    null, $user->id, $lineUserId,
+                    $toCard->rankup_coupon_id,
                     'rank_up',
-                    $upgradedCard->rankup_coupon_expires_days ?? null
+                    $toCard->rankup_coupon_expires_days ?? null
                 );
                 if ($rankupResult) {
                     if (isset($rankupResult['lottery'])) {
@@ -279,19 +281,18 @@ class StampCardController extends Controller
             } else {
                 // 旧方式: coupon_templates の type=rank_up & rank_card_id で検索
                 $tpl = DB::table('coupon_templates')
-                    ->where('store_id', $store)
                     ->where('type', 'rank_up')
-                    ->where('rank_card_id', $upgradedToCardId)
+                    ->where('rank_card_id', $toCard->id)
                     ->where('is_active', true)
                     ->orderByDesc('id')
                     ->first();
 
                 if ($tpl) {
                     if (($tpl->mode ?? 'normal') === 'lottery') {
-                        $lotteryResult = app(LotteryService::class)->draw($store, $user->id, $tpl->id, 'rank_up');
+                        $lotteryResult = app(LotteryService::class)->draw(null, $user->id, $tpl->id, 'rank_up');
                     } else {
                         $userCouponId = DB::table('user_coupons')->insertGetId([
-                            'store_id' => $store,
+                            'store_id' => null,
                             'user_id' => $user->id,
                             'coupon_template_id' => $tpl->id,
                             'message_bubble_id' => null,
@@ -319,8 +320,10 @@ class StampCardController extends Controller
                     }
                 }
             }
+        }
 
-            // プッシュ通知
+        // プッシュ通知（ランクアップがあった場合）
+        if (!empty($rankUpResults)) {
             try {
                 $msg = $issuedCoupon
                     ? "🎉 {$upgradedToDisplayName}にランクアップしました！クーポン「{$issuedCoupon['title']}」が発行されました。"
@@ -339,7 +342,7 @@ class StampCardController extends Controller
                 'current_card_id' => $newUser->current_card_id,
                 'visit_count' => (int) $newUser->visit_count,
                 'last_visit_at' => (string) $newUser->last_visit_at,
-                'upgraded_to_gold' => $upgraded,
+                'upgraded_to_gold' => !empty($rankUpResults),
                 'upgraded_to' => $upgradedToDisplayName,
                 'issued_coupon' => $issuedCoupon,
             ];
@@ -357,7 +360,7 @@ class StampCardController extends Controller
     /**
      * クーポンテンプレートに基づいてクーポン付与 or 抽選を実行
      */
-    private function processCouponTrigger(int $storeId, int $userId, string $lineUserId, int $couponTemplateId, string $triggerType, ?int $expiresDays = null): ?array
+    private function processCouponTrigger(?int $storeId, int $userId, string $lineUserId, int $couponTemplateId, string $triggerType, ?int $expiresDays = null): ?array
     {
         $tpl = DB::table('coupon_templates')
             ->where('id', $couponTemplateId)
@@ -412,7 +415,6 @@ class StampCardController extends Controller
         abort_if(!$lineUserId, 401, 'LIFF認証が必要です');
 
         $user = DB::table('users')
-            ->where('store_id', $store)
             ->where('line_user_id', $lineUserId)
             ->first();
         abort_if(!$user, 404, 'user not found');

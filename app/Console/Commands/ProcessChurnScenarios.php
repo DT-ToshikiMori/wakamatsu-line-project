@@ -40,9 +40,8 @@ class ProcessChurnScenarios extends Command
     {
         $targetDate = now()->subDays($scenario->days_after_last_stamp)->startOfDay();
 
-        // 最終来店日がX日前のユーザーを取得（その日に来店して以降来ていない）
+        // 最終来店日がX日前のユーザーを取得（全ユーザー対象）
         $users = DB::table('users')
-            ->where('store_id', $scenario->store_id)
             ->whereNotNull('line_user_id')
             ->whereNotNull('last_visit_at')
             ->whereDate('last_visit_at', $targetDate)

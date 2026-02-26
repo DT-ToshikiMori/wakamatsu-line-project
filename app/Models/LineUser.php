@@ -17,6 +17,15 @@ class LineUser extends Model
     {
         return $this->belongsTo(Store::class);
     }
+
+    /**
+     * line_user_id でグローバルに一意なユーザーを検索
+     */
+    public static function findByLineUserId(string $lineUserId): ?self
+    {
+        return static::where('line_user_id', $lineUserId)->first();
+    }
+
     public function visits()
     {
         return $this->hasMany(Visit::class, 'user_id');
