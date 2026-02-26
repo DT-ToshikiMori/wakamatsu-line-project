@@ -1,35 +1,42 @@
 <x-filament-widgets::widget>
   <x-filament::section heading="属性分析">
+    {{-- Chart.js CDN（Filament内部のChart.jsがグローバルに見えない場合の保険） --}}
+    <script>
+      if (typeof window.Chart === 'undefined') {
+        var s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js';
+        document.head.appendChild(s);
+      }
+    </script>
+
     <div
       x-data="{
-        ready: false,
-        retryCount: 0,
+        charts: [],
         genderData: @js($genderData),
         rankData: @js($rankData),
         birthMonthData: @js($birthMonthData),
         visitData: @js($visitData),
         lastVisitData: @js($lastVisitData),
+        retryCount: 0,
         initCharts() {
-          if (typeof Chart === 'undefined') {
-            if (this.retryCount < 20) {
+          if (typeof window.Chart === 'undefined') {
+            if (this.retryCount < 30) {
               this.retryCount++;
-              setTimeout(() => this.initCharts(), 300);
+              setTimeout(() => this.initCharts(), 200);
             }
             return;
           }
-          this.ready = true;
           this.$nextTick(() => {
-            this.renderDoughnut('genderChart', this.genderData);
-            this.renderDoughnut('rankChart', this.rankData);
-            this.renderBar('birthMonthChart', this.birthMonthData, '#f59e0b', false);
-            this.renderBar('visitChart', this.visitData, '#fbbf24', false);
-            this.renderBar('lastVisitChart', this.lastVisitData, null, true);
+            this.renderDoughnut(this.$refs.genderChart, this.genderData);
+            this.renderDoughnut(this.$refs.rankChart, this.rankData);
+            this.renderBar(this.$refs.birthMonthChart, this.birthMonthData, '#f59e0b', false);
+            this.renderBar(this.$refs.visitChart, this.visitData, '#fbbf24', false);
+            this.renderBar(this.$refs.lastVisitChart, this.lastVisitData, null, true);
           });
         },
-        renderDoughnut(id, data) {
-          const ctx = document.getElementById(id);
-          if (!ctx) return;
-          new Chart(ctx, {
+        renderDoughnut(canvas, data) {
+          if (!canvas) return;
+          this.charts.push(new Chart(canvas, {
             type: 'doughnut',
             data: {
               labels: data.labels,
@@ -46,13 +53,12 @@
                 legend: { position: 'bottom', labels: { color: '#9ca3af', font: { size: 11 } } }
               }
             }
-          });
+          }));
         },
-        renderBar(id, data, color, horizontal) {
-          const ctx = document.getElementById(id);
-          if (!ctx) return;
+        renderBar(canvas, data, color, horizontal) {
+          if (!canvas) return;
           const bgColors = data.colors || data.values.map(() => color);
-          new Chart(ctx, {
+          this.charts.push(new Chart(canvas, {
             type: 'bar',
             data: {
               labels: data.labels,
@@ -75,23 +81,28 @@
                 y: { ticks: { color: '#9ca3af' }, grid: { color: 'rgba(255,255,255,.06)' } }
               }
             }
-          });
+          }));
+        },
+        destroyCharts() {
+          this.charts.forEach(c => c.destroy());
+          this.charts = [];
         }
       }"
       x-init="initCharts()"
+      x-on:beforeunmount.window="destroyCharts()"
     >
       {{-- 2列グリッド: ドーナツ2つ --}}
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div class="rounded-xl border border-gray-700 p-4">
           <div class="text-sm font-semibold mb-3 text-gray-300">性別分布</div>
           <div class="flex justify-center" style="max-height:220px">
-            <canvas id="genderChart"></canvas>
+            <canvas x-ref="genderChart"></canvas>
           </div>
         </div>
         <div class="rounded-xl border border-gray-700 p-4">
           <div class="text-sm font-semibold mb-3 text-gray-300">ランク分布</div>
           <div class="flex justify-center" style="max-height:220px">
-            <canvas id="rankChart"></canvas>
+            <canvas x-ref="rankChart"></canvas>
           </div>
         </div>
       </div>
@@ -101,13 +112,13 @@
         <div class="rounded-xl border border-gray-700 p-4">
           <div class="text-sm font-semibold mb-3 text-gray-300">誕生月分布</div>
           <div style="height:200px">
-            <canvas id="birthMonthChart"></canvas>
+            <canvas x-ref="birthMonthChart"></canvas>
           </div>
         </div>
         <div class="rounded-xl border border-gray-700 p-4">
           <div class="text-sm font-semibold mb-3 text-gray-300">来店回数分布</div>
           <div style="height:200px">
-            <canvas id="visitChart"></canvas>
+            <canvas x-ref="visitChart"></canvas>
           </div>
         </div>
       </div>
@@ -116,7 +127,7 @@
       <div class="mt-4 rounded-xl border border-gray-700 p-4">
         <div class="text-sm font-semibold mb-3 text-gray-300">最終来店経過日数</div>
         <div style="height:200px">
-          <canvas id="lastVisitChart"></canvas>
+          <canvas x-ref="lastVisitChart"></canvas>
         </div>
       </div>
     </div>
