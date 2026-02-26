@@ -42,6 +42,10 @@ class AdminPanelProvider extends PanelProvider
                 \App\Filament\Widgets\KpiOverview::class,
                 \App\Filament\Widgets\VisitsTrend::class,
 
+                // 分析
+                \App\Filament\Widgets\ReturnRateAnalysis::class,
+                \App\Filament\Widgets\AttributeAnalysis::class,
+
                 // クーポン状況（今月）
                 \App\Filament\Widgets\CouponKpi::class,
                 \App\Filament\Widgets\CouponTemplateRanking::class,

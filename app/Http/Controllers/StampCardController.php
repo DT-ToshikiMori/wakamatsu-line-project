@@ -60,6 +60,11 @@ class StampCardController extends Controller
             }
         }
 
+        // 性別未登録 → 登録フォームへリダイレクト
+        if ($user->gender === null) {
+            return redirect("/s/{$store}/register");
+        }
+
         // ① ランク定義（グローバル、priority順）
         $cards = DB::table('stamp_card_definitions')
             ->where('is_active', true)
@@ -131,6 +136,54 @@ class StampCardController extends Controller
             'nextCard' => $nextCard,
             'isBeginner' => $isBeginner,
         ]);
+    }
+
+    public function registerForm(Request $req, int $store)
+    {
+        $lineUserId = $req->attributes->get('line_user_id');
+        if (!$lineUserId) {
+            return response()->view('liff-auth');
+        }
+
+        $storeRow = DB::table('stores')->where('id', $store)->first();
+        abort_if(!$storeRow, 404, 'store not found');
+
+        $user = DB::table('users')->where('line_user_id', $lineUserId)->first();
+        abort_if(!$user, 404, 'user not found');
+
+        // 既に登録済みならカードページへ
+        if ($user->gender !== null) {
+            return redirect("/s/{$store}/card");
+        }
+
+        return view('stamp.register', [
+            'store' => $storeRow,
+            'user' => $user,
+        ]);
+    }
+
+    public function registerSave(Request $req, int $store)
+    {
+        $lineUserId = $req->attributes->get('line_user_id');
+        abort_if(!$lineUserId, 401, 'LIFF認証が必要です');
+
+        $user = DB::table('users')->where('line_user_id', $lineUserId)->first();
+        abort_if(!$user, 404, 'user not found');
+
+        $validated = $req->validate([
+            'gender' => 'required|in:male,female,other',
+            'birth_year' => 'nullable|integer|min:1920|max:' . date('Y'),
+            'birth_month' => 'nullable|integer|min:1|max:12',
+        ]);
+
+        DB::table('users')->where('id', $user->id)->update([
+            'gender' => $validated['gender'],
+            'birth_year' => $validated['birth_year'] ?? null,
+            'birth_month' => $validated['birth_month'] ?? null,
+            'updated_at' => now(),
+        ]);
+
+        return redirect("/s/{$store}/card");
     }
 
     public function checkin(Request $req, int $store)

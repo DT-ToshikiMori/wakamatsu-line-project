@@ -77,6 +77,21 @@ class ProcessBroadcasts extends Command
             if (!empty($broadcast->filter_min_visits)) {
                 $query->where('visit_count', '>=', $broadcast->filter_min_visits);
             }
+
+            // 性別
+            if (!empty($broadcast->filter_gender)) {
+                $query->where('gender', $broadcast->filter_gender);
+            }
+
+            // 誕生月
+            if (!empty($broadcast->filter_birth_month)) {
+                $query->where('birth_month', $broadcast->filter_birth_month);
+            }
+
+            // 来店回数X回以下
+            if (!empty($broadcast->filter_max_visits)) {
+                $query->where('visit_count', '<=', $broadcast->filter_max_visits);
+            }
         }
 
         $users = $query->get();

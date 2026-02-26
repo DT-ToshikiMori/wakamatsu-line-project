@@ -11,6 +11,8 @@ class LineUser extends Model
     protected $casts = [
         'last_visit_at' => 'datetime',
         'first_visit_at' => 'datetime',
+        'birth_year' => 'integer',
+        'birth_month' => 'integer',
     ];
 
     public function store()

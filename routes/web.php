@@ -71,6 +71,8 @@ Route::get('/r/{slug}', function (Request $req, string $slug) {
 // LIFF認証が必要なルート
 Route::middleware('liff')->group(function () {
     Route::get('/s/{store}/card', [StampCardController::class, 'card']);
+    Route::get('/s/{store}/register', [StampCardController::class, 'registerForm']);
+    Route::post('/s/{store}/register', [StampCardController::class, 'registerSave']);
     Route::post('/s/{store}/checkin', [StampCardController::class, 'checkin']);
     Route::post('/s/{store}/clear', [StampCardController::class, 'clear']);
 

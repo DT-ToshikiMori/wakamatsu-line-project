@@ -71,6 +71,29 @@ class BroadcastResource extends Resource
                         ->minValue(1)
                         ->nullable()
                         ->visible(fn ($get) => $get('filter_type') === 'filtered'),
+
+                    Forms\Components\Select::make('filter_gender')
+                        ->label('性別')
+                        ->options([
+                            'male' => '男性',
+                            'female' => '女性',
+                            'other' => 'その他',
+                        ])
+                        ->nullable()
+                        ->visible(fn ($get) => $get('filter_type') === 'filtered'),
+
+                    Forms\Components\Select::make('filter_birth_month')
+                        ->label('誕生月')
+                        ->options(collect(range(1, 12))->mapWithKeys(fn ($m) => [$m => $m . '月']))
+                        ->nullable()
+                        ->visible(fn ($get) => $get('filter_type') === 'filtered'),
+
+                    Forms\Components\TextInput::make('filter_max_visits')
+                        ->label('来店回数X回以下')
+                        ->numeric()
+                        ->minValue(1)
+                        ->nullable()
+                        ->visible(fn ($get) => $get('filter_type') === 'filtered'),
                 ]),
 
             // 配信予定日時

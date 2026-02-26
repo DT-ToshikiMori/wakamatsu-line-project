@@ -29,7 +29,26 @@ class LineUserResource extends Resource
     {
         return $form
             ->schema([
-                //
+                Forms\Components\Select::make('gender')
+                    ->label('性別')
+                    ->options([
+                        'male' => '男性',
+                        'female' => '女性',
+                        'other' => 'その他',
+                    ])
+                    ->nullable(),
+
+                Forms\Components\TextInput::make('birth_year')
+                    ->label('生まれ年')
+                    ->numeric()
+                    ->minValue(1920)
+                    ->maxValue(date('Y'))
+                    ->nullable(),
+
+                Forms\Components\Select::make('birth_month')
+                    ->label('誕生月')
+                    ->options(collect(range(1, 12))->mapWithKeys(fn ($m) => [$m => $m . '月']))
+                    ->nullable(),
             ]);
     }
 
@@ -59,6 +78,21 @@ class LineUserResource extends Resource
                     ->copyable()
                     ->toggleable(isToggledHiddenByDefault: true),
 
+                Tables\Columns\TextColumn::make('gender')
+                    ->label('性別')
+                    ->formatStateUsing(fn (?string $state) => match ($state) {
+                        'male' => '男性',
+                        'female' => '女性',
+                        'other' => 'その他',
+                        default => '未登録',
+                    })
+                    ->toggleable(),
+
+                Tables\Columns\TextColumn::make('birth_month')
+                    ->label('誕生月')
+                    ->formatStateUsing(fn (?int $state) => $state ? $state . '月' : '未登録')
+                    ->toggleable(isToggledHiddenByDefault: true),
+
                 Tables\Columns\TextColumn::make('visit_count')
                     ->label('来店回数')
                     ->sortable(),
@@ -84,16 +118,25 @@ class LineUserResource extends Resource
                             // Excel文字化け対策（UTF-8 BOM）
                             fwrite($out, "\xEF\xBB\xBF");
 
-                            fputcsv($out, ['store', 'display_name', 'line_user_id', 'visit_count', 'last_visit_at']);
+                            fputcsv($out, ['store', 'display_name', 'line_user_id', 'gender', 'birth_year', 'birth_month', 'visit_count', 'last_visit_at']);
 
                             $query->chunk(500, function ($rows) use ($out) {
                                 foreach ($rows as $u) {
                                     $last = $u->last_visit_at ?? $u->created_at;
+                                    $genderLabel = match ($u->gender) {
+                                        'male' => '男性',
+                                        'female' => '女性',
+                                        'other' => 'その他',
+                                        default => '',
+                                    };
 
                                     fputcsv($out, [
                                         $u->store?->name ?? '',
                                         $u->display_name ?? '',
                                         $u->line_user_id ?? '',
+                                        $genderLabel,
+                                        (string)($u->birth_year ?? ''),
+                                        $u->birth_month ? $u->birth_month . '月' : '',
                                         (string)($u->visit_count ?? 0),
                                         $last ? $last->format('Y-m-d H:i:s') : '',
                                     ]);
