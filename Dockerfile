@@ -26,6 +26,9 @@ RUN npm install
 # アプリ本体
 COPY . .
 
+# php.ini（アップロード設定）
+RUN cp php.ini /usr/local/etc/php/php.ini
+
 # .env 準備
 RUN cp .env.example .env && php artisan key:generate
 
