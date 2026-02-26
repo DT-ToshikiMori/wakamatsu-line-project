@@ -11,6 +11,16 @@ class ReturnRateAnalysis extends ChartWidget
 
     protected int | string | array $columnSpan = 'full';
 
+    protected ?float $churnRate = null;
+
+    public function getHeading(): string|\Illuminate\Contracts\Support\Htmlable|null
+    {
+        if ($this->churnRate === null) {
+            $this->getCachedData();
+        }
+        return "再来率分析（失客率: {$this->churnRate}%）";
+    }
+
     protected function getType(): string
     {
         return 'bar';
@@ -60,7 +70,7 @@ class ReturnRateAnalysis extends ChartWidget
 
         $churnRate = $totalUsers > 0 ? round(($churnCount / $totalUsers) * 100, 1) : 0;
 
-        static::$heading = "再来率分析（失客率: {$churnRate}%）";
+        $this->churnRate = $churnRate;
 
         $values = [
             (int) ($dist->v1 ?? 0),

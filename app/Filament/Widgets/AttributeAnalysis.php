@@ -41,8 +41,8 @@ class AttributeAnalysis extends Widget
         $rankRows = DB::table('users as u')
             ->whereNotNull('u.line_user_id')
             ->leftJoin('stamp_card_definitions as scd', 'scd.id', '=', 'u.current_card_id')
-            ->selectRaw('COALESCE(scd.display_name, "未設定") as rank_name, COUNT(*) as cnt')
-            ->groupBy('rank_name')
+            ->selectRaw("COALESCE(scd.display_name, '未設定') as rank_name, COUNT(*) as cnt")
+            ->groupBy(DB::raw("COALESCE(scd.display_name, '未設定')"))
             ->orderByDesc('cnt')
             ->get();
 
