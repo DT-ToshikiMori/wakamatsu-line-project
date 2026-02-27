@@ -37,7 +37,7 @@ Route::get('/admin/qr-download/{storeQrLink}', function (\App\Models\StoreQrLink
     return response($image)
         ->header('Content-Type', 'image/png')
         ->header('Content-Disposition', 'attachment; filename="qr-' . $storeQrLink->slug . '.png"');
-})->middleware(['web', 'auth'])->name('store-qr-link.download-qr');
+})->middleware(['web', 'auth:admin'])->name('store-qr-link.download-qr');
 
 // 管理画面（認証はFilamentが担当）
 Route::get('/admin/users', function (Request $req) {
