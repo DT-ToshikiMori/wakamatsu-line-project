@@ -24,8 +24,7 @@ Route::get('/admin/qr-download/{storeQrLink}', function (\App\Models\StoreQrLink
     $liffId = config('services.line.liff_id');
     abort_if(!$liffId, 500, 'LIFF_ID is not configured');
 
-    $path = "/s/{$storeQrLink->store_id}/card?qr_link_id={$storeQrLink->id}";
-    $url = "https://liff.line.me/{$liffId}?path=" . urlencode($path);
+    $url = "https://liff.line.me/{$liffId}/s/{$storeQrLink->store_id}/card?qr_link_id={$storeQrLink->id}";
 
     $options = new \chillerlan\QRCode\QROptions([
         'outputType' => \chillerlan\QRCode\Output\QROutputInterface::GDIMAGE_PNG,

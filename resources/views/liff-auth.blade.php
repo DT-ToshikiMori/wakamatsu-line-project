@@ -157,12 +157,17 @@
 
       // セッション確立完了 → 遷移先へリダイレクト
       msg.textContent = '読み込み中...';
-      if (liffState) {
-        // QR経由: liff.state に遷移先パスが入っている
-        window.location.replace(liffState);
-      } else if (window.location.pathname !== '/') {
-        // liff.init() が URL を書き換え済み
-        window.location.reload();
+
+      // 遷移先を決定: liff.state > liff.init()後のパス > ハッシュ
+      const dest = liffState
+        || (window.location.pathname !== '/' ? window.location.pathname + window.location.search : null)
+        || window.location.hash.replace(/^#/, '')
+        || null;
+
+      log('dest: ' + dest);
+
+      if (dest) {
+        window.location.replace(dest);
       } else {
         // 遷移先なし → 認証完了表示
         spinner.style.display = 'none';
