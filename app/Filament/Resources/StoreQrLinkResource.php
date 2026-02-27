@@ -27,6 +27,9 @@ class StoreQrLinkResource extends Resource
     public static function form(Form $form): Form
     {
         return $form->schema([
+            Forms\Components\Hidden::make('shop_id')
+                ->default(1),
+
             Forms\Components\Select::make('store_id')
                 ->label('店舗')
                 ->relationship('store', 'name')
