@@ -5,9 +5,6 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\StoreQrLinkResource\Pages;
 use App\Filament\Resources\StoreQrLinkResource\RelationManagers;
 use App\Models\StoreQrLink;
-use chillerlan\QRCode\QRCode;
-use chillerlan\QRCode\QROptions;
-use chillerlan\QRCode\Output\QROutputInterface;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -100,20 +97,8 @@ class StoreQrLinkResource extends Resource
                 Tables\Actions\Action::make('downloadQr')
                     ->label('QR')
                     ->icon('heroicon-o-qr-code')
-                    ->action(function (StoreQrLink $record) {
-                        $url = config('app.url') . '/r/' . $record->slug;
-                        $options = new QROptions([
-                            'outputType' => QROutputInterface::GDIMAGE_PNG,
-                            'scale' => 10,
-                            'outputBase64' => false,
-                        ]);
-                        $image = (new QRCode($options))->render($url);
-                        return response()->streamDownload(
-                            fn () => print($image),
-                            "qr-{$record->slug}.png",
-                            ['Content-Type' => 'image/png']
-                        );
-                    }),
+                    ->url(fn (StoreQrLink $record) => route('store-qr-link.download-qr', $record))
+                    ->openUrlInNewTab(),
             ]);
     }
 

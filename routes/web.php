@@ -19,6 +19,26 @@ Route::post('/api/liff/init', [LiffController::class, 'init']);
 // LINE Webhook（CSRF除外 → VerifyCsrfToken で除外設定が必要）
 Route::post('/webhook/line', [LineWebhookController::class, 'handle']);
 
+// QRコード画像ダウンロード（Filament管理画面から呼ばれる）
+Route::get('/admin/qr-download/{storeQrLink}', function (\App\Models\StoreQrLink $storeQrLink) {
+    $liffId = config('services.line.liff_id');
+    abort_if(!$liffId, 500, 'LIFF_ID is not configured');
+
+    $path = "/s/{$storeQrLink->store_id}/card?qr_link_id={$storeQrLink->id}";
+    $url = "https://liff.line.me/{$liffId}?path=" . urlencode($path);
+
+    $options = new \chillerlan\QRCode\QROptions([
+        'outputType' => \chillerlan\QRCode\Output\QROutputInterface::GDIMAGE_PNG,
+        'scale' => 10,
+        'outputBase64' => false,
+    ]);
+    $image = (new \chillerlan\QRCode\QRCode($options))->render($url);
+
+    return response($image)
+        ->header('Content-Type', 'image/png')
+        ->header('Content-Disposition', 'attachment; filename="qr-' . $storeQrLink->slug . '.png"');
+})->middleware(['web', 'auth'])->name('store-qr-link.download-qr');
+
 // 管理画面（認証はFilamentが担当）
 Route::get('/admin/users', function (Request $req) {
     $storeId = $req->integer('store_id');
