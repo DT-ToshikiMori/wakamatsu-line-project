@@ -107,7 +107,7 @@
       </div>
 
       {{-- 2列グリッド: 棒グラフ2つ --}}
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
         <div class="rounded-xl border border-gray-700 p-4">
           <div class="text-sm font-semibold mb-3 text-gray-300">誕生月分布</div>
           <div style="height:200px">
@@ -123,7 +123,7 @@
       </div>
 
       {{-- 全幅: 横棒グラフ --}}
-      <div class="mt-4 rounded-xl border border-gray-700 p-4">
+      <div class="mt-6 rounded-xl border border-gray-700 p-4">
         <div class="text-sm font-semibold mb-3 text-gray-300">最終来店経過日数</div>
         <div style="height:200px">
           <canvas x-ref="lastVisitChart"></canvas>

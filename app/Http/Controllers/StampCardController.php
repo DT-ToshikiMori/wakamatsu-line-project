@@ -29,7 +29,7 @@ class StampCardController extends Controller
         $user = DB::table('users')->where('line_user_id', $lineUserId)->first();
         if (!$user) {
             $userId = DB::table('users')->insertGetId([
-                'store_id' => null,
+                'store_id' => $store,
                 'line_user_id' => $lineUserId,
                 'display_name' => $displayName,
                 'profile_image_url' => $picture,
