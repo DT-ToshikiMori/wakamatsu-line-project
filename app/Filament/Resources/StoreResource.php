@@ -26,6 +26,9 @@ class StoreResource extends Resource
     public static function form(Form $form): Form
     {
         return $form->schema([
+            Forms\Components\Hidden::make('shop_id')
+                ->default(1),
+
             Forms\Components\TextInput::make('name')
                 ->label('店舗名')
                 ->required()
