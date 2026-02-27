@@ -69,6 +69,9 @@
     const spinner = document.getElementById('spinner');
     const debug = document.getElementById('debug');
 
+    // liff.init() 前に liff.state（遷移先パス）を保存
+    const liffState = new URLSearchParams(window.location.search).get('liff.state');
+
     function log(text) {
       debug.textContent += text + '\n';
       console.log('[liff-auth]', text);
@@ -152,9 +155,19 @@
       const data = await res.json();
       log('user_id: ' + (data.user_id || '?'));
 
-      // セッション確立完了 → リロード
+      // セッション確立完了 → 遷移先へリダイレクト
       msg.textContent = '読み込み中...';
-      window.location.reload();
+      if (liffState) {
+        // QR経由: liff.state に遷移先パスが入っている
+        window.location.replace(liffState);
+      } else if (window.location.pathname !== '/') {
+        // liff.init() が URL を書き換え済み
+        window.location.reload();
+      } else {
+        // 遷移先なし → 認証完了表示
+        spinner.style.display = 'none';
+        msg.textContent = '認証が完了しました';
+      }
 
     } catch (e) {
       console.error('LIFF auth error:', e);
