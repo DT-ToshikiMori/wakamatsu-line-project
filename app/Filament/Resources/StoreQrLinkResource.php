@@ -45,12 +45,6 @@ class StoreQrLinkResource extends Resource
                 ->maxLength(255)
                 ->helperText('例：dt-test-front（英数字とハイフン推奨）'),
 
-            Forms\Components\TextInput::make('redirect_url')
-                ->label('リダイレクトURL')
-                ->url()
-                ->maxLength(2000)
-                ->helperText('LINEのスタンプ付与URL（u.lin.ee など）'),
-
             Forms\Components\TextInput::make('stamp_count')
                 ->label('スタンプ付与数')
                 ->numeric()
@@ -85,11 +79,6 @@ class StoreQrLinkResource extends Resource
                 Tables\Columns\TextColumn::make('store.name')
                     ->label('店舗')
                     ->sortable(),
-
-                Tables\Columns\TextColumn::make('redirect_url')
-                    ->label('リダイレクトURL')
-                    ->limit(30)
-                    ->copyable(),
 
                 Tables\Columns\TextColumn::make('stamp_count')
                     ->label('スタンプ数')
