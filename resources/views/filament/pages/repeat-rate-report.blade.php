@@ -51,7 +51,7 @@
     {{-- レポートテーブル --}}
     <x-filament::section>
         <div class="overflow-x-auto -mx-6 px-6" wire:loading.class="opacity-50">
-            <table style="width:100%; border-collapse:collapse; font-size:13px;">
+            <table style="width:100%; border-collapse:collapse; font-size:16px;">
                 {{-- ヘッダー --}}
                 <thead>
                     <tr>
@@ -145,7 +145,7 @@
         </div>
 
         {{-- 凡例 --}}
-        <div class="mt-4 flex flex-wrap gap-6 text-xs" style="color:#999;">
+        <div class="flex flex-wrap gap-6" style="color:#999; margin-top:24px; font-size:13px;">
             <div class="flex items-center gap-1.5">
                 <span class="inline-block w-3 h-3 rounded" style="background:#14532d;"></span>
                 累計再来（累計ユニーク再来客数）
