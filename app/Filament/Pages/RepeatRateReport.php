@@ -53,6 +53,16 @@ class RepeatRateReport extends Page
             ->toArray();
     }
 
+    public function getMonthOptions(): array
+    {
+        $options = [];
+        for ($i = 1; $i <= 6; $i++) {
+            $m = now()->subMonths($i);
+            $options[$m->format('Y-m')] = $m->format('Y年n月');
+        }
+        return $options;
+    }
+
     protected function computeReport(): void
     {
         if (empty($this->baseMonth)) {

@@ -4,9 +4,9 @@
     <x-filament::section>
         <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
             <div>
-                <label class="block text-sm font-medium text-gray-300 mb-1">店舗</label>
+                <label class="fi-fo-field-wrp-label block text-sm font-medium mb-1">店舗</label>
                 <select wire:model.live="storeId"
-                        class="w-full rounded-lg border-gray-600 bg-gray-700 text-white text-sm py-2 px-3">
+                        class="fi-input block w-full rounded-lg shadow-sm border border-gray-300 dark:border-white/10 bg-white dark:bg-white/5 text-gray-950 dark:text-white text-sm py-2 px-3">
                     <option value="">全店舗</option>
                     @foreach($this->getStoreOptions() as $id => $name)
                         <option value="{{ $id }}">{{ $name }}</option>
@@ -15,9 +15,9 @@
             </div>
 
             <div>
-                <label class="block text-sm font-medium text-gray-300 mb-1">性別</label>
+                <label class="fi-fo-field-wrp-label block text-sm font-medium mb-1">性別</label>
                 <select wire:model.live="gender"
-                        class="w-full rounded-lg border-gray-600 bg-gray-700 text-white text-sm py-2 px-3">
+                        class="fi-input block w-full rounded-lg shadow-sm border border-gray-300 dark:border-white/10 bg-white dark:bg-white/5 text-gray-950 dark:text-white text-sm py-2 px-3">
                     <option value="">すべて</option>
                     <option value="male">男性</option>
                     <option value="female">女性</option>
@@ -26,18 +26,22 @@
             </div>
 
             <div>
-                <label class="block text-sm font-medium text-gray-300 mb-1">処理年月</label>
-                <input type="month" wire:model.live="baseMonth"
-                       class="w-full rounded-lg border-gray-600 bg-gray-700 text-white text-sm py-2 px-3" />
+                <label class="fi-fo-field-wrp-label block text-sm font-medium mb-1">処理年月</label>
+                <select wire:model.live="baseMonth"
+                        class="fi-input block w-full rounded-lg shadow-sm border border-gray-300 dark:border-white/10 bg-white dark:bg-white/5 text-gray-950 dark:text-white text-sm py-2 px-3">
+                    @foreach($this->getMonthOptions() as $val => $label)
+                        <option value="{{ $val }}">{{ $label }}</option>
+                    @endforeach
+                </select>
             </div>
 
             <div>
                 <button wire:click="exportCsv"
-                        class="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700
-                               text-white text-sm font-medium rounded-lg transition">
-                    <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
-                    </svg>
+                        class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold
+                               text-white shadow-sm transition
+                               bg-success-600 hover:bg-success-500
+                               dark:bg-success-500 dark:hover:bg-success-400">
+                    <x-heroicon-s-arrow-down-tray class="w-4 h-4" />
                     CSVダウンロード
                 </button>
             </div>
@@ -46,96 +50,92 @@
 
     {{-- レポートテーブル --}}
     <x-filament::section>
-        <div class="overflow-x-auto" wire:loading.class="opacity-50">
-            <table class="w-full text-sm border-collapse">
+        <div class="overflow-x-auto -mx-6 px-6" wire:loading.class="opacity-50">
+            <table style="width:100%; border-collapse:collapse; font-size:13px;">
+                {{-- ヘッダー --}}
                 <thead>
-                    <tr class="bg-gray-800 text-gray-300">
-                        <th rowspan="2" class="border border-gray-600 px-3 py-2 text-center whitespace-nowrap"></th>
-                        <th rowspan="2" class="border border-gray-600 px-3 py-2 text-center whitespace-nowrap">来店数</th>
-                        <th colspan="2" class="border border-gray-600 px-2 py-1 text-center whitespace-nowrap">同月再来</th>
+                    <tr>
+                        <th rowspan="2" style="background:#2d6a4f; color:#fff; border:1px solid #4a4a4a; padding:8px 12px; text-align:center; min-width:70px;"></th>
+                        <th rowspan="2" style="background:#2d6a4f; color:#fff; border:1px solid #4a4a4a; padding:8px 12px; text-align:center; white-space:nowrap;">来店数</th>
+                        <th colspan="2" style="background:#2d6a4f; color:#fff; border:1px solid #4a4a4a; padding:6px 8px; text-align:center; white-space:nowrap;">同月再来</th>
                         @for($m = 1; $m <= 6; $m++)
-                            <th colspan="2" class="border border-gray-600 px-2 py-1 text-center whitespace-nowrap">
-                                {{ $monthLabels[$m] ?? '' }}<br><span class="text-xs font-normal">再来累計</span>
+                            <th colspan="2" style="background:#2d6a4f; color:#fff; border:1px solid #4a4a4a; padding:6px 8px; text-align:center; white-space:nowrap;">
+                                {{ $monthLabels[$m] ?? '' }}再来<br><span style="font-size:11px; font-weight:normal;">累計</span>
                             </th>
                         @endfor
-                        <th colspan="2" class="border border-gray-600 px-2 py-1 text-center whitespace-nowrap">失客</th>
+                        <th rowspan="2" style="background:#8b0000; color:#fff; border:1px solid #4a4a4a; padding:8px 8px; text-align:center; white-space:nowrap;">失客</th>
                     </tr>
                 </thead>
                 <tbody>
                     @forelse($reportData as $key => $row)
-                        {{-- 上段: 新規再来数 --}}
-                        <tr class="{{ $key === '合計' ? 'font-semibold' : '' }} hover:bg-gray-800/50">
-                            <td rowspan="2"
-                                class="border border-gray-600 px-3 py-2 text-center font-bold whitespace-nowrap
-                                       {{ $key === '合計' ? 'bg-amber-900/20' : '' }}">
+                        @php
+                            $isTotal = $key === '合計';
+                            $labelBg = $isTotal ? '#3a3a3a' : '#2a2a2a';
+                            $cellBg = $isTotal ? '#333' : '#1e1e1e';
+                        @endphp
+
+                        {{-- 上段: 新規再来 --}}
+                        <tr>
+                            <td rowspan="2" style="background:{{ $labelBg }}; color:#fff; border:1px solid #4a4a4a; padding:8px 12px; text-align:center; font-weight:bold; white-space:nowrap;">
                                 {{ $row['label'] }}
                             </td>
-                            <td rowspan="2"
-                                class="border border-gray-600 px-3 py-2 text-center font-bold tabular-nums">
+                            <td rowspan="2" style="background:{{ $cellBg }}; color:#fff; border:1px solid #4a4a4a; padding:8px 12px; text-align:center; font-weight:bold; font-variant-numeric:tabular-nums;">
                                 {{ number_format($row['total']) }}
                             </td>
 
                             {{-- 同月再来 --}}
-                            <td class="border border-gray-600 px-2 py-1 text-right tabular-nums">
+                            <td style="background:{{ $cellBg }}; color:#ddd; border:1px solid #4a4a4a; padding:4px 8px; text-align:right; font-variant-numeric:tabular-nums;">
                                 {{ number_format($row['same_month']['count']) }}
                             </td>
-                            <td class="border border-gray-600 px-2 py-1 text-right tabular-nums">
-                                {{ $row['same_month']['pct'] }}&nbsp;%
+                            <td style="background:{{ $cellBg }}; color:#ddd; border:1px solid #4a4a4a; padding:4px 8px; text-align:right; font-variant-numeric:tabular-nums;">
+                                {{ $row['same_month']['pct'] }} %
                             </td>
 
                             {{-- 月別: 新規再来 --}}
                             @for($m = 1; $m <= 6; $m++)
                                 @php $md = $row['months'][$m]; @endphp
-                                @if($md['is_future'])
-                                    <td class="border border-gray-600 px-2 py-1 text-right text-gray-600 tabular-nums">0</td>
-                                    <td class="border border-gray-600 px-2 py-1 text-right text-gray-600 tabular-nums">0.0&nbsp;%</td>
-                                @else
-                                    <td class="border border-gray-600 px-2 py-1 text-right tabular-nums">
-                                        {{ number_format($md['net_new']) }}
-                                    </td>
-                                    <td class="border border-gray-600 px-2 py-1 text-right tabular-nums">
-                                        {{ $md['net_new_pct'] }}&nbsp;%
-                                    </td>
-                                @endif
+                                <td style="background:{{ $cellBg }}; color:{{ $md['is_future'] ? '#555' : '#ddd' }}; border:1px solid #4a4a4a; padding:4px 8px; text-align:right; font-variant-numeric:tabular-nums;">
+                                    {{ number_format($md['net_new']) }}
+                                </td>
+                                <td style="background:{{ $cellBg }}; color:{{ $md['is_future'] ? '#555' : '#ddd' }}; border:1px solid #4a4a4a; padding:4px 8px; text-align:right; font-variant-numeric:tabular-nums;">
+                                    {{ $md['net_new_pct'] }} %
+                                </td>
                             @endfor
 
                             {{-- 失客 --}}
-                            <td rowspan="2" class="border border-gray-600 px-2 py-1 text-right font-bold tabular-nums text-red-400">
-                                {{ number_format($row['lost']['count']) }}
-                            </td>
-                            <td rowspan="2" class="border border-gray-600 px-2 py-1 text-right font-bold tabular-nums text-red-400">
-                                {{ $row['lost']['pct'] }}&nbsp;%
+                            <td rowspan="2" style="background:#3d1111; color:#f87171; border:1px solid #4a4a4a; padding:8px 8px; text-align:center; font-weight:bold; font-variant-numeric:tabular-nums; line-height:1.8;">
+                                {{ number_format($row['lost']['count']) }}<br>{{ $row['lost']['pct'] }} %
                             </td>
                         </tr>
 
-                        {{-- 下段: 累計再来数（緑） --}}
-                        <tr class="{{ $key === '合計' ? 'font-semibold' : '' }}">
-                            {{-- 同月再来（累計＝同月と同じ） --}}
-                            <td class="border border-gray-600 px-2 py-1 text-right tabular-nums bg-emerald-900/25 text-emerald-400">
+                        {{-- 下段: 累計再来（緑） --}}
+                        <tr>
+                            {{-- 同月再来 累計 --}}
+                            <td style="background:#14532d; color:#4ade80; border:1px solid #4a4a4a; padding:4px 8px; text-align:right; font-weight:bold; font-variant-numeric:tabular-nums;">
                                 {{ number_format($row['same_month']['count']) }}
                             </td>
-                            <td class="border border-gray-600 px-2 py-1 text-right tabular-nums bg-emerald-900/25 text-emerald-400">
-                                {{ $row['same_month']['pct'] }}&nbsp;%
+                            <td style="background:#14532d; color:#4ade80; border:1px solid #4a4a4a; padding:4px 8px; text-align:right; font-weight:bold; font-variant-numeric:tabular-nums;">
+                                {{ $row['same_month']['pct'] }} %
                             </td>
 
                             @for($m = 1; $m <= 6; $m++)
                                 @php $md = $row['months'][$m]; @endphp
                                 @if($md['is_future'])
-                                    <td class="border border-gray-600 px-2 py-1 text-right tabular-nums bg-emerald-900/10 text-gray-600">0</td>
-                                    <td class="border border-gray-600 px-2 py-1 text-right tabular-nums bg-emerald-900/10 text-gray-600">0.0&nbsp;%</td>
+                                    <td style="background:#0f2e1a; color:#555; border:1px solid #4a4a4a; padding:4px 8px; text-align:right; font-variant-numeric:tabular-nums;">0</td>
+                                    <td style="background:#0f2e1a; color:#555; border:1px solid #4a4a4a; padding:4px 8px; text-align:right; font-variant-numeric:tabular-nums;">0.0 %</td>
                                 @else
-                                    <td class="border border-gray-600 px-2 py-1 text-right tabular-nums bg-emerald-900/25 text-emerald-400">
+                                    <td style="background:#14532d; color:#4ade80; border:1px solid #4a4a4a; padding:4px 8px; text-align:right; font-weight:bold; font-variant-numeric:tabular-nums;">
                                         {{ number_format($md['cumulative']) }}
                                     </td>
-                                    <td class="border border-gray-600 px-2 py-1 text-right tabular-nums bg-emerald-900/25 text-emerald-400">
-                                        {{ $md['cumulative_pct'] }}&nbsp;%
+                                    <td style="background:#14532d; color:#4ade80; border:1px solid #4a4a4a; padding:4px 8px; text-align:right; font-weight:bold; font-variant-numeric:tabular-nums;">
+                                        {{ $md['cumulative_pct'] }} %
                                     </td>
                                 @endif
                             @endfor
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="18" class="text-center py-8 text-gray-500">
+                            <td colspan="18" style="text-align:center; padding:32px; color:#888;">
                                 データがありません
                             </td>
                         </tr>
@@ -145,17 +145,17 @@
         </div>
 
         {{-- 凡例 --}}
-        <div class="mt-4 flex flex-wrap gap-6 text-xs text-gray-400">
+        <div class="mt-4 flex flex-wrap gap-6 text-xs" style="color:#999;">
             <div class="flex items-center gap-1.5">
-                <span class="inline-block w-3 h-3 rounded" style="background: rgba(6,78,59,0.25)"></span>
+                <span class="inline-block w-3 h-3 rounded" style="background:#14532d;"></span>
                 累計再来（累計ユニーク再来客数）
             </div>
             <div class="flex items-center gap-1.5">
-                <span class="inline-block w-3 h-3 rounded bg-red-900/50"></span>
+                <span class="inline-block w-3 h-3 rounded" style="background:#3d1111;"></span>
                 失客（追跡期間内に再来なし）
             </div>
-            <div class="text-gray-500">
-                カテゴリ: 新規=初来店 / 再来=累計2〜4回 / 準固定=累計5〜9回 / 固定=累計10回以上
+            <div>
+                新規=初来店 / 再来=累計2〜4回 / 準固定=累計5〜9回 / 固定=累計10回以上
             </div>
         </div>
     </x-filament::section>
