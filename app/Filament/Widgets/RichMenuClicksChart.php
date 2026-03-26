@@ -2,8 +2,10 @@
 
 namespace App\Filament\Widgets;
 
+use Carbon\Carbon;
 use Filament\Widgets\ChartWidget;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class RichMenuClicksChart extends ChartWidget
 {
@@ -24,7 +26,15 @@ class RichMenuClicksChart extends ChartWidget
             $dates->push($now->copy()->subDays($i)->format('Y-m-d'));
         }
 
-        // エリア別の14日間クリックデータ
+        $defaultLabels = $dates->map(fn ($d) => Carbon::parse($d)->format('m/d'))->toArray();
+
+        if (!Schema::hasTable('rich_menu_clicks')) {
+            return [
+                'labels' => $defaultLabels,
+                'datasets' => [],
+            ];
+        }
+
         $rows = DB::table('rich_menu_clicks as rc')
             ->join('rich_menu_areas as ra', 'ra.id', '=', 'rc.rich_menu_area_id')
             ->where('rc.clicked_at', '>=', $now->copy()->subDays(14))
@@ -55,7 +65,7 @@ class RichMenuClicksChart extends ChartWidget
         }
 
         return [
-            'labels' => $dates->map(fn ($d) => \Carbon\Carbon::parse($d)->format('m/d'))->toArray(),
+            'labels' => $defaultLabels,
             'datasets' => $datasets,
         ];
     }

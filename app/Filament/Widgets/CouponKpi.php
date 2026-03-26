@@ -20,15 +20,15 @@ class CouponKpi extends StatsOverviewWidget
 
         // 配信数：今月のbroadcast_logsのうちクーポンバブルが含まれる配信のログ数
         $broadcastCount = DB::table('broadcast_logs as bl')
-            ->join('broadcasts as b', 'b.id', '=', 'bl.broadcast_id')
-            ->join('message_bubbles as mb', function ($join) {
-                $join->on('mb.parent_id', '=', 'b.id')
-                    ->where('mb.parent_type', '=', 'broadcast')
-                    ->where('mb.bubble_type', '=', 'coupon');
-            })
             ->whereBetween('bl.sent_at', [$monthStart, $monthEnd])
-            ->distinct('bl.id')
-            ->count('bl.id');
+            ->whereExists(function ($q) {
+                $q->select(DB::raw(1))
+                    ->from('message_bubbles as mb')
+                    ->whereColumn('mb.parent_id', 'bl.broadcast_id')
+                    ->where('mb.parent_type', 'broadcast')
+                    ->where('mb.bubble_type', 'coupon');
+            })
+            ->count();
 
         // 取得数（発行数）
         $issued = DB::table('user_coupons')

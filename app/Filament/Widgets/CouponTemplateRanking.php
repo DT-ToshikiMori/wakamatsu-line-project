@@ -44,7 +44,9 @@ class CouponTemplateRanking extends Widget
                 ->where('mb.bubble_type', 'coupon')
                 ->whereIn('mb.coupon_template_id', $templateIds)
                 ->groupBy('mb.coupon_template_id')
-                ->pluck(DB::raw('COUNT(DISTINCT bl.id)'), 'mb.coupon_template_id')
+                ->select('mb.coupon_template_id', DB::raw('COUNT(DISTINCT bl.id) as cnt'))
+                ->get()
+                ->pluck('cnt', 'coupon_template_id')
                 ->toArray();
         }
 

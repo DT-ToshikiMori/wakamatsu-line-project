@@ -5,6 +5,7 @@ namespace App\Filament\Widgets;
 use Filament\Widgets\StatsOverviewWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class RichMenuClicksKpi extends StatsOverviewWidget
 {
@@ -15,33 +16,36 @@ class RichMenuClicksKpi extends StatsOverviewWidget
 
     protected function getStats(): array
     {
+        if (!Schema::hasTable('rich_menu_clicks')) {
+            return [
+                Stat::make('今日のクリック', '-'),
+                Stat::make('今月のクリック', '-'),
+                Stat::make('人気エリア', '-'),
+            ];
+        }
+
         $today = now()->toDateString();
         $monthStart = now()->startOfMonth();
         $monthEnd = now()->endOfMonth();
 
-        // 今日のクリック数
         $todayClicks = DB::table('rich_menu_clicks')
             ->whereDate('clicked_at', $today)
             ->count();
 
-        // 今日のユニークユーザー数
         $todayUnique = DB::table('rich_menu_clicks')
             ->whereDate('clicked_at', $today)
-            ->distinct('line_user_id')
+            ->distinct()
             ->count('line_user_id');
 
-        // 今月のクリック数
         $monthClicks = DB::table('rich_menu_clicks')
             ->whereBetween('clicked_at', [$monthStart, $monthEnd])
             ->count();
 
-        // 今月のユニーク数
         $monthUnique = DB::table('rich_menu_clicks')
             ->whereBetween('clicked_at', [$monthStart, $monthEnd])
-            ->distinct('line_user_id')
+            ->distinct()
             ->count('line_user_id');
 
-        // 人気エリア（今月）
         $popularArea = DB::table('rich_menu_clicks as rc')
             ->join('rich_menu_areas as ra', 'ra.id', '=', 'rc.rich_menu_area_id')
             ->whereBetween('rc.clicked_at', [$monthStart, $monthEnd])
