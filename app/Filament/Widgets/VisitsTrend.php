@@ -32,9 +32,9 @@ class VisitsTrend extends ChartWidget
 
         // ① 日別：総来店（visits件数）
         $totalRows = DB::table('visits')
-            ->select(DB::raw('DATE(visited_at) as d'), DB::raw('COUNT(*) as c'))
+            ->select(DB::raw('CAST(visited_at AS date) as d'), DB::raw('COUNT(*) as c'))
             ->whereBetween('visited_at', [$start, $end])
-            ->groupBy(DB::raw('DATE(visited_at)'))
+            ->groupBy(DB::raw('CAST(visited_at AS date)'))
             ->orderBy('d')
             ->get();
 
@@ -47,7 +47,7 @@ class VisitsTrend extends ChartWidget
             ->select(
                 'user_id',
                 'store_id',
-                DB::raw('MIN(DATE(visited_at)) as first_d')
+                DB::raw('MIN(CAST(visited_at AS date)) as first_d')
             )
             ->groupBy('user_id', 'store_id');
 

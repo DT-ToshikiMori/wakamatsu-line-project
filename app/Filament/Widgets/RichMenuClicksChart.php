@@ -39,11 +39,11 @@ class RichMenuClicksChart extends ChartWidget
             ->join('rich_menu_areas as ra', 'ra.id', '=', 'rc.rich_menu_area_id')
             ->where('rc.clicked_at', '>=', $now->copy()->subDays(14))
             ->select([
-                DB::raw('DATE(rc.clicked_at) as date'),
+                DB::raw('CAST(rc.clicked_at AS date) as click_date'),
                 'ra.label',
                 DB::raw('COUNT(*) as clicks'),
             ])
-            ->groupBy('date', 'ra.label')
+            ->groupBy(DB::raw('CAST(rc.clicked_at AS date)'), 'ra.label')
             ->orderBy('date')
             ->get();
 
@@ -54,7 +54,7 @@ class RichMenuClicksChart extends ChartWidget
         foreach ($labels as $idx => $label) {
             $data = [];
             foreach ($dates as $date) {
-                $match = $rows->first(fn ($r) => $r->date === $date && $r->label === $label);
+                $match = $rows->first(fn ($r) => $r->click_date === $date && $r->label === $label);
                 $data[] = $match ? $match->clicks : 0;
             }
             $datasets[] = [

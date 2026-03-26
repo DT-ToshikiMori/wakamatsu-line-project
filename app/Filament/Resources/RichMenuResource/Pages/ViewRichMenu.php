@@ -34,7 +34,7 @@ class ViewRichMenu extends Page
 
             $uniqueUsers = DB::table('rich_menu_clicks')
                 ->where('rich_menu_area_id', $area->id)
-                ->distinct('line_user_id')
+                ->distinct()
                 ->count('line_user_id');
 
             $todayClicks = DB::table('rich_menu_clicks')
@@ -64,12 +64,12 @@ class ViewRichMenu extends Page
             ->where('ra.rich_menu_id', $richMenu->id)
             ->where('rc.clicked_at', '>=', $now->copy()->subDays(14))
             ->select([
-                DB::raw('DATE(rc.clicked_at) as date'),
+                DB::raw('CAST(rc.clicked_at AS date) as click_date'),
                 'ra.label',
                 DB::raw('COUNT(*) as clicks'),
             ])
-            ->groupBy('date', 'ra.label')
-            ->orderBy('date')
+            ->groupBy(DB::raw('CAST(rc.clicked_at AS date)'), 'ra.label')
+            ->orderBy('click_date')
             ->get();
 
         // 日付リスト（14日分）
@@ -87,7 +87,7 @@ class ViewRichMenu extends Page
         foreach ($labels as $idx => $label) {
             $data = [];
             foreach ($dates as $date) {
-                $match = $trendData->first(fn ($r) => $r->date === $date && $r->label === $label);
+                $match = $trendData->first(fn ($r) => $r->click_date === $date && $r->label === $label);
                 $data[] = $match ? $match->clicks : 0;
             }
             $chartDatasets[] = [
