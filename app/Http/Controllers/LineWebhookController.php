@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\RichMenuClick;
 use App\Services\LineBotService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -107,6 +108,8 @@ class LineWebhookController extends Controller
 
         if ($action === 'claim_coupon') {
             $this->handleCouponClaim($userId, $replyToken, $params);
+        } elseif ($action === 'richmenu_click') {
+            $this->handleRichMenuClick($userId, $params);
         }
     }
 
@@ -127,5 +130,29 @@ class LineWebhookController extends Controller
             $replyToken,
             "下記リンクからクーポンを取得してください。\n{$claimUrl}"
         );
+    }
+
+    protected function handleRichMenuClick(string $lineUserId, array $params): void
+    {
+        $areaId = (int) ($params['area_id'] ?? 0);
+
+        if ($areaId <= 0) {
+            Log::warning('LineWebhook: richmenu_click missing area_id', ['params' => $params]);
+            return;
+        }
+
+        $userId = DB::table('users')->where('line_user_id', $lineUserId)->value('id');
+
+        RichMenuClick::create([
+            'rich_menu_area_id' => $areaId,
+            'user_id' => $userId,
+            'line_user_id' => $lineUserId,
+            'clicked_at' => now(),
+        ]);
+
+        Log::info('LineWebhook: richmenu_click recorded', [
+            'area_id' => $areaId,
+            'line_user_id' => $lineUserId,
+        ]);
     }
 }

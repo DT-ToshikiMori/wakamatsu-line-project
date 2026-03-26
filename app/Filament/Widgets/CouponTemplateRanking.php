@@ -14,7 +14,7 @@ class CouponTemplateRanking extends Widget
 
     protected function getViewData(): array
     {
-        // テンプレ別：発行/使用を集計
+        // テンプレ別：配信/発行（取得）/使用を集計
         $rows = DB::table('coupon_templates as ct')
             ->leftJoin('user_coupons as uc', 'uc.coupon_template_id', '=', 'ct.id')
             ->select([
@@ -25,24 +25,45 @@ class CouponTemplateRanking extends Widget
                 DB::raw("SUM(CASE WHEN uc.used_at IS NOT NULL OR uc.status = 'used' THEN 1 ELSE 0 END) as used"),
             ])
             ->groupBy('ct.id', 'ct.type', 'ct.title')
-            ->orderByDesc('used')      // まずは「使用枚数」順
-            ->orderByDesc('issued')    // 同数なら発行枚数
+            ->orderByDesc('used')
+            ->orderByDesc('issued')
             ->limit(20)
             ->get();
 
-        // 使用率はPHP側で計算（DB差異を避ける）
-        $items = $rows->map(function ($r) {
+        // テンプレ別の配信数（broadcast_logs経由）を取得
+        $templateIds = $rows->pluck('id')->toArray();
+
+        $broadcastCounts = [];
+        if (!empty($templateIds)) {
+            $broadcastCounts = DB::table('message_bubbles as mb')
+                ->join('broadcasts as b', function ($join) {
+                    $join->on('mb.parent_id', '=', 'b.id')
+                        ->where('mb.parent_type', '=', 'broadcast');
+                })
+                ->join('broadcast_logs as bl', 'bl.broadcast_id', '=', 'b.id')
+                ->where('mb.bubble_type', 'coupon')
+                ->whereIn('mb.coupon_template_id', $templateIds)
+                ->groupBy('mb.coupon_template_id')
+                ->pluck(DB::raw('COUNT(DISTINCT bl.id)'), 'mb.coupon_template_id')
+                ->toArray();
+        }
+
+        $items = $rows->map(function ($r) use ($broadcastCounts) {
             $issued = (int) $r->issued;
             $used = (int) $r->used;
-            $rate = $issued > 0 ? round(($used / $issued) * 100, 1) : 0.0;
+            $broadcast = (int) ($broadcastCounts[$r->id] ?? 0);
+            $usageRate = $issued > 0 ? round(($used / $issued) * 100, 1) : 0.0;
+            $acquisitionRate = $broadcast > 0 ? round(($issued / $broadcast) * 100, 1) : 0.0;
 
             return (object) [
                 'id' => $r->id,
                 'type' => $r->type,
                 'title' => $r->title,
+                'broadcast' => $broadcast,
                 'issued' => $issued,
                 'used' => $used,
-                'rate' => $rate,
+                'acquisitionRate' => $acquisitionRate,
+                'usageRate' => $usageRate,
             ];
         });
 

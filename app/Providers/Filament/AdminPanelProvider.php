@@ -50,6 +50,10 @@ class AdminPanelProvider extends PanelProvider
                 \App\Filament\Widgets\CouponKpi::class,
                 \App\Filament\Widgets\CouponTemplateRanking::class,
 
+                // リッチメニュー
+                \App\Filament\Widgets\RichMenuClicksKpi::class,
+                \App\Filament\Widgets\RichMenuClicksChart::class,
+
                 // 店舗サマリー
                 \App\Filament\Widgets\StoreRanking::class,
             ])

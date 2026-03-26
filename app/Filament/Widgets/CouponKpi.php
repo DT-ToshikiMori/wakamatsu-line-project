@@ -18,21 +18,46 @@ class CouponKpi extends StatsOverviewWidget
         $monthStart = now()->startOfMonth();
         $monthEnd   = now()->endOfMonth();
 
+        // 配信数：今月のbroadcast_logsのうちクーポンバブルが含まれる配信のログ数
+        $broadcastCount = DB::table('broadcast_logs as bl')
+            ->join('broadcasts as b', 'b.id', '=', 'bl.broadcast_id')
+            ->join('message_bubbles as mb', function ($join) {
+                $join->on('mb.parent_id', '=', 'b.id')
+                    ->where('mb.parent_type', '=', 'broadcast')
+                    ->where('mb.bubble_type', '=', 'coupon');
+            })
+            ->whereBetween('bl.sent_at', [$monthStart, $monthEnd])
+            ->distinct('bl.id')
+            ->count('bl.id');
+
+        // 取得数（発行数）
         $issued = DB::table('user_coupons')
             ->whereBetween('issued_at', [$monthStart, $monthEnd])
             ->count();
 
+        // 取得率
+        $acquisitionRate = $broadcastCount > 0
+            ? round(($issued / $broadcastCount) * 100, 1)
+            : 0.0;
+
+        // 使用数
         $used = DB::table('user_coupons')
             ->whereNotNull('used_at')
             ->whereBetween('used_at', [$monthStart, $monthEnd])
             ->count();
 
-        $rate = $issued > 0 ? round(($used / $issued) * 100, 1) : 0.0;
+        // 使用率
+        $usageRate = $issued > 0 ? round(($used / $issued) * 100, 1) : 0.0;
 
         return [
-            Stat::make('発行数', $issued),
+            Stat::make('配信数', $broadcastCount)
+                ->description('クーポン配信ユーザー数'),
+            Stat::make('取得数', $issued),
+            Stat::make('取得率', $acquisitionRate . '%')
+                ->description('配信→取得'),
             Stat::make('使用数', $used),
-            Stat::make('使用率', $rate . '%'),
+            Stat::make('使用率', $usageRate . '%')
+                ->description('取得→使用'),
         ];
     }
 }

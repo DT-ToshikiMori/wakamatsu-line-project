@@ -12,9 +12,11 @@
           </div>
 
           <div class="flex items-center gap-3 whitespace-nowrap">
-            <div class="text-xs opacity-70">発行 {{ $r->issued }}</div>
+            <div class="text-xs opacity-70">配信 {{ $r->broadcast }}</div>
+            <div class="text-xs opacity-70">取得 {{ $r->issued }}</div>
+            <div class="text-xs text-blue-600 font-semibold">取得率 {{ $r->acquisitionRate }}%</div>
             <div class="text-xs opacity-70">使用 {{ $r->used }}</div>
-            <div class="text-sm font-bold">{{ $r->rate }}%</div>
+            <div class="text-sm font-bold">使用率 {{ $r->usageRate }}%</div>
           </div>
         </div>
       @empty

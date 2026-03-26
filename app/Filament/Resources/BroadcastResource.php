@@ -212,6 +212,11 @@ class BroadcastResource extends Resource
             ])
             ->defaultSort('updated_at', 'desc')
             ->actions([
+                Tables\Actions\Action::make('view')
+                    ->label('分析')
+                    ->icon('heroicon-o-chart-bar')
+                    ->url(fn (Broadcast $record) => static::getUrl('view', ['record' => $record]))
+                    ->visible(fn (Broadcast $record) => $record->status === 'sent'),
                 Tables\Actions\EditAction::make(),
                 Tables\Actions\Action::make('send')
                     ->label('配信する')
@@ -249,6 +254,7 @@ class BroadcastResource extends Resource
             'index' => Pages\ListBroadcasts::route('/'),
             'create' => Pages\CreateBroadcast::route('/create'),
             'edit' => Pages\EditBroadcast::route('/{record}/edit'),
+            'view' => Pages\ViewBroadcast::route('/{record}'),
         ];
     }
 }
