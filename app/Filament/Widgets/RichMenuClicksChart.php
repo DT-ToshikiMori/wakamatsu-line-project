@@ -44,7 +44,7 @@ class RichMenuClicksChart extends ChartWidget
                 DB::raw('COUNT(*) as clicks'),
             ])
             ->groupBy(DB::raw('CAST(rc.clicked_at AS date)'), 'ra.label')
-            ->orderBy('date')
+            ->orderBy('click_date')
             ->get();
 
         $labels = $rows->pluck('label')->unique()->values()->toArray();
