@@ -3,23 +3,24 @@
 namespace App\Filament\Resources\BroadcastResource\Pages;
 
 use App\Filament\Resources\BroadcastResource;
-use App\Models\Broadcast;
+use Filament\Resources\Pages\Concerns\InteractsWithRecord;
 use Filament\Resources\Pages\Page;
 use Illuminate\Support\Facades\DB;
 
 class ViewBroadcast extends Page
 {
+    use InteractsWithRecord;
+
     protected static string $resource = BroadcastResource::class;
 
     protected static string $view = 'filament.resources.broadcast-resource.pages.view-broadcast';
 
     protected static ?string $title = '配信分析';
 
-    public Broadcast $record;
-
     public function mount(int | string $record): void
     {
-        $this->record = Broadcast::findOrFail($record);
+        $this->record = $this->resolveRecord($record);
+        $this->authorizeAccess();
     }
 
     protected function getViewData(): array

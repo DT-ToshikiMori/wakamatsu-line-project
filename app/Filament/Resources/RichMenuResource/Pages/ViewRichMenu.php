@@ -3,23 +3,25 @@
 namespace App\Filament\Resources\RichMenuResource\Pages;
 
 use App\Filament\Resources\RichMenuResource;
-use App\Models\RichMenu;
+use Filament\Resources\Pages\Concerns\InteractsWithRecord;
 use Filament\Resources\Pages\Page;
 use Illuminate\Support\Facades\DB;
 
 class ViewRichMenu extends Page
 {
+    use InteractsWithRecord;
+
     protected static string $resource = RichMenuResource::class;
 
     protected static string $view = 'filament.resources.rich-menu-resource.pages.view-rich-menu';
 
     protected static ?string $title = 'リッチメニュー分析';
 
-    public RichMenu $record;
-
     public function mount(int | string $record): void
     {
-        $this->record = RichMenu::with('areas')->findOrFail($record);
+        $this->record = $this->resolveRecord($record);
+        $this->record->load('areas');
+        $this->authorizeAccess();
     }
 
     protected function getViewData(): array
