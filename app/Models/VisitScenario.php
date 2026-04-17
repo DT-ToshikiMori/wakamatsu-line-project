@@ -13,6 +13,7 @@ class VisitScenario extends Model
         'stamp_number',
         'from_visit_count',
         'segment_filter',
+        'coupon_template_id',
         'delay_hours',
         'expires_days',
         'is_active',
@@ -21,5 +22,10 @@ class VisitScenario extends Model
     public function stampCardDefinition()
     {
         return $this->belongsTo(StampCardDefinition::class);
+    }
+
+    public function couponTemplate()
+    {
+        return $this->belongsTo(\App\Models\CouponTemplate::class);
     }
 }

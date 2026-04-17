@@ -14,6 +14,7 @@ return new class extends Migration
             $table->integer('stamp_number')->nullable();
             $table->integer('from_visit_count')->nullable();
             $table->string('segment_filter')->nullable();
+            $table->foreignId('coupon_template_id')->constrained()->cascadeOnDelete();
             $table->integer('delay_hours')->default(0);
             $table->integer('expires_days')->nullable();
             $table->boolean('is_active')->default(true);

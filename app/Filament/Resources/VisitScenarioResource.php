@@ -52,6 +52,13 @@ class VisitScenarioResource extends Resource
                 ])
                 ->nullable(),
 
+            Forms\Components\Select::make('coupon_template_id')
+                ->label('クーポンテンプレート')
+                ->relationship('couponTemplate', 'title')
+                ->searchable()
+                ->preload()
+                ->required(),
+
             Forms\Components\TextInput::make('delay_hours')
                 ->label('何時間後に送るか')
                 ->numeric()
@@ -101,6 +108,10 @@ class VisitScenarioResource extends Resource
                         default => '全員',
                     })
                     ->sortable(),
+
+                Tables\Columns\TextColumn::make('couponTemplate.title')
+                    ->label('クーポン')
+                    ->searchable(),
 
                 Tables\Columns\TextColumn::make('delay_hours')
                     ->label('遅延（時間）')
