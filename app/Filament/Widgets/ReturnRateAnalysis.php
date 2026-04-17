@@ -21,6 +21,11 @@ class ReturnRateAnalysis extends ChartWidget
         return "再来率分析（失客率: {$this->churnRate}%）";
     }
 
+    protected function getContentHeight(): ?int
+    {
+        return 300;
+    }
+
     protected function getType(): string
     {
         return 'bar';

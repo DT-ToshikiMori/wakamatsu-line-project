@@ -39,6 +39,46 @@ class LineBotService
     }
 
     /**
+     * マルチキャスト送信（最大500件）
+     */
+    public function multicast(array $userIds, array $messages): bool
+    {
+        if (empty($this->accessToken)) {
+            Log::warning('LineBotService: LINE_BOT_CHANNEL_ACCESS_TOKEN is not configured');
+            return false;
+        }
+
+        if (empty($userIds)) {
+            return true;
+        }
+
+        try {
+            $response = Http::withToken($this->accessToken)
+                ->post('https://api.line.me/v2/bot/message/multicast', [
+                    'to' => array_values($userIds),
+                    'messages' => $messages,
+                ]);
+
+            if (!$response->successful()) {
+                Log::warning('LineBotService: multicast failed', [
+                    'count' => count($userIds),
+                    'status' => $response->status(),
+                    'body' => $response->body(),
+                ]);
+                return false;
+            }
+
+            return true;
+        } catch (\Throwable $e) {
+            Log::error('LineBotService: exception during multicast', [
+                'count' => count($userIds),
+                'message' => $e->getMessage(),
+            ]);
+            return false;
+        }
+    }
+
+    /**
      * テキストメッセージをリプライ送信（replyToken使用）
      */
     public function replyText(string $replyToken, string $text): bool

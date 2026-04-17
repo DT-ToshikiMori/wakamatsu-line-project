@@ -387,6 +387,33 @@ class StampCardController extends Controller
             }
         }
 
+        // 来店シナリオ: visit_scenario_sends に scheduled_at を積む
+        $visitCount = (int) $newUser->visit_count;
+
+        $scenarios = DB::table('visit_scenarios')
+            ->where('is_active', true)
+            ->where(function ($q) use ($visitCount) {
+                $q->where('visit_number', $visitCount)
+                  ->orWhere(function ($q2) use ($visitCount) {
+                      $q2->where('visit_number', 999)
+                         ->whereRaw('? >= 4', [$visitCount]);
+                  });
+            })
+            ->get();
+
+        foreach ($scenarios as $scenario) {
+            $scheduledAt = now()->addHours((int) ($scenario->delay_hours ?? 0));
+            DB::table('visit_scenario_sends')->insert([
+                'user_id'      => $user->id,
+                'scenario_id'  => $scenario->id,
+                'scheduled_at' => $scheduledAt,
+                'sent_at'      => null,
+                'coupon_issued_at' => null,
+                'created_at'   => now(),
+                'updated_at'   => now(),
+            ]);
+        }
+
         if ($req->expectsJson()) {
             $response = [
                 'ok' => true,

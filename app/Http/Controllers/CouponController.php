@@ -24,6 +24,12 @@ class CouponController extends Controller
             ->first();
         abort_if(!$user, 404, 'user not found');
 
+        // 来店シナリオ経由: scenario_id があればクーポン自動発行
+        $scenarioId = (int) $req->query('scenario_id', 0);
+        if ($scenarioId) {
+            $this->claimScenarioCoupon($user, $scenarioId);
+        }
+
         $coupons = DB::table('user_coupons as uc')
             ->join('coupon_templates as ct', 'ct.id', '=', 'uc.coupon_template_id')
             ->where('uc.user_id', $user->id)
@@ -42,8 +48,10 @@ class CouponController extends Controller
             ->orderByDesc('uc.issued_at')
             ->get();
 
+        $storeId = (int) $req->query('store', 0) ?: (int) ($user->store_id ?? 0);
+
         return view('coupons.index', [
-            'storeId' => (int) $req->query('store', 0),
+            'storeId' => $storeId,
             'coupons' => $coupons,
         ]);
     }
@@ -81,8 +89,10 @@ class CouponController extends Controller
             ->first();
         abort_if(!$coupon, 404, 'coupon not found');
 
+        $storeId = (int) $req->query('store', 0) ?: (int) ($user->store_id ?? 0);
+
         return view('coupons.show', [
-            'storeId' => (int) $req->query('store', 0),
+            'storeId' => $storeId,
             'coupon' => $coupon,
             'isUsed' => !empty($coupon->used_at) || $coupon->status === 'used',
             'usedAt' => $coupon->used_at,
@@ -129,8 +139,10 @@ class CouponController extends Controller
         $expiresAt = $this->calculateExpiresAt($bubble, $sentAt);
         $isExpired = $expiresAt && $expiresAt->isPast();
 
+        $storeId = (int) $req->query('store', 0) ?: (int) ($user->store_id ?? 0);
+
         return view('coupons.claim', [
-            'storeId' => (int) $req->query('store', 0),
+            'storeId' => $storeId,
             'bubbleId' => $bubbleId,
             'tplId' => $tplId,
             'sentAt' => $sentAt,
@@ -253,6 +265,76 @@ class CouponController extends Controller
             'user_coupon_id' => $userCouponId,
             'expires_at' => $expiresAt?->format('Y/m/d H:i'),
         ]);
+    }
+
+    /**
+     * 来店シナリオ経由のクーポン発行（LIFF遷移時に自動発行）
+     */
+    private function claimScenarioCoupon(object $user, int $scenarioId): void
+    {
+        // 未発行の送信レコードを確認（二重発行防止: coupon_issued_at IS NULL）
+        $send = DB::table('visit_scenario_sends')
+            ->where('user_id', $user->id)
+            ->where('scenario_id', $scenarioId)
+            ->whereNotNull('sent_at')
+            ->whereNull('coupon_issued_at')
+            ->orderByDesc('id')
+            ->first();
+
+        if (!$send) {
+            return;
+        }
+
+        $scenario = DB::table('visit_scenarios')
+            ->where('id', $scenarioId)
+            ->first();
+
+        if (!$scenario) {
+            return;
+        }
+
+        $tpl = DB::table('coupon_templates')
+            ->where('id', $scenario->coupon_template_id)
+            ->where('is_active', true)
+            ->first();
+
+        if (!$tpl) {
+            return;
+        }
+
+        $now = now();
+        $expiresAt = $scenario->expires_days
+            ? $now->copy()->addDays((int) $scenario->expires_days)
+            : null;
+
+        // クーポン発行
+        $userCouponId = DB::table('user_coupons')->insertGetId([
+            'store_id' => null,
+            'user_id' => $user->id,
+            'coupon_template_id' => $tpl->id,
+            'message_bubble_id' => null,
+            'status' => 'issued',
+            'issued_at' => $now,
+            'used_at' => null,
+            'expires_at' => $expiresAt,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        DB::table('coupon_events')->insert([
+            'user_coupon_id' => $userCouponId,
+            'event' => 'issued',
+            'actor' => 'system',
+            'created_at' => $now,
+        ]);
+
+        // coupon_issued_at を更新
+        DB::table('visit_scenario_sends')
+            ->where('id', $send->id)
+            ->update([
+                'coupon_issued_at' => $now,
+                'updated_at' => $now,
+            ]);
     }
 
     private function calculateExpiresAt(object $bubble, int $sentAt): ?Carbon
