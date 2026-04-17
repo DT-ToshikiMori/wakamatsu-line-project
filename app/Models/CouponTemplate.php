@@ -15,6 +15,7 @@ class CouponTemplate extends Model
         'inactive_days','inactive_hour','inactive_minute',
         'required_stamps',
         'rank_card_id',
+        'reminder_hours_before_expiry',
     ];
 
     /**

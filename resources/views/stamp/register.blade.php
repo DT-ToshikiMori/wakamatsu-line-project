@@ -167,6 +167,27 @@
       @csrf
 
       <div class="field">
+        <label>当店へのご来店回数<span class="required">必須</span></label>
+        <div class="radioGroup" id="visitFreqRadios">
+          <label class="{{ old('visit_frequency') === 'new' ? 'selected' : '' }}">
+            <input type="radio" name="visit_frequency" value="new" {{ old('visit_frequency') === 'new' ? 'checked' : '' }}>
+            <span>はじめて</span>
+          </label>
+          <label class="{{ old('visit_frequency') === '2_3' ? 'selected' : '' }}">
+            <input type="radio" name="visit_frequency" value="2_3" {{ old('visit_frequency') === '2_3' ? 'checked' : '' }}>
+            <span>2〜3回</span>
+          </label>
+          <label class="{{ old('visit_frequency') === '4plus' ? 'selected' : '' }}">
+            <input type="radio" name="visit_frequency" value="4plus" {{ old('visit_frequency') === '4plus' ? 'checked' : '' }}>
+            <span>4回以上</span>
+          </label>
+        </div>
+        @error('visit_frequency')
+          <div class="error">{{ $message }}</div>
+        @enderror
+      </div>
+
+      <div class="field">
         <label>性別<span class="required">必須</span></label>
         <div class="radioGroup" id="genderRadios">
           <label class="{{ old('gender') === 'male' ? 'selected' : '' }}">
@@ -215,6 +236,12 @@
 @include('partials.liff-init')
 <script>
   // Radio button selection styling
+  document.querySelectorAll('#visitFreqRadios label').forEach(label => {
+    label.addEventListener('click', () => {
+      document.querySelectorAll('#visitFreqRadios label').forEach(l => l.classList.remove('selected'));
+      label.classList.add('selected');
+    });
+  });
   document.querySelectorAll('#genderRadios label').forEach(label => {
     label.addEventListener('click', () => {
       document.querySelectorAll('#genderRadios label').forEach(l => l.classList.remove('selected'));
@@ -224,8 +251,14 @@
 
   // Form submit with LIFF auth header
   document.getElementById('registerForm').addEventListener('submit', function(e) {
-    const checked = document.querySelector('input[name="gender"]:checked');
-    if (!checked) {
+    const visitFreqChecked = document.querySelector('input[name="visit_frequency"]:checked');
+    if (!visitFreqChecked) {
+      e.preventDefault();
+      alert('来店回数を選択してください');
+      return;
+    }
+    const genderChecked = document.querySelector('input[name="gender"]:checked');
+    if (!genderChecked) {
       e.preventDefault();
       alert('性別を選択してください');
       return;

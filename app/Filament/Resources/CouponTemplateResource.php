@@ -110,6 +110,11 @@ class CouponTemplateResource extends Resource
                 ->searchable()
                 ->visible(fn ($get) => $get('type') === 'rank_up'),
 
+            Forms\Components\TextInput::make('reminder_hours_before_expiry')
+                ->label('期限前リマインド（時間前）空欄=なし')
+                ->numeric()
+                ->nullable(),
+
             Forms\Components\Toggle::make('is_active')
                 ->label('有効')
                 ->default(true),

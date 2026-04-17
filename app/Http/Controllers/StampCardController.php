@@ -60,8 +60,8 @@ class StampCardController extends Controller
             }
         }
 
-        // 性別未登録 → 登録フォームへリダイレクト
-        if ($user->gender === null) {
+        // 未登録項目あり → 登録フォームへリダイレクト
+        if ($user->gender === null || $user->visit_frequency === null) {
             return redirect("/s/{$store}/register");
         }
 
@@ -152,7 +152,7 @@ class StampCardController extends Controller
         abort_if(!$user, 404, 'user not found');
 
         // 既に登録済みならカードページへ
-        if ($user->gender !== null) {
+        if ($user->gender !== null && $user->visit_frequency !== null) {
             return redirect("/s/{$store}/card");
         }
 
@@ -171,12 +171,14 @@ class StampCardController extends Controller
         abort_if(!$user, 404, 'user not found');
 
         $validated = $req->validate([
+            'visit_frequency' => 'required|in:new,2_3,4plus',
             'gender' => 'required|in:male,female,other',
             'birth_year' => 'nullable|integer|min:1920|max:' . date('Y'),
             'birth_month' => 'nullable|integer|min:1|max:12',
         ]);
 
         DB::table('users')->where('id', $user->id)->update([
+            'visit_frequency' => $validated['visit_frequency'],
             'gender' => $validated['gender'],
             'birth_year' => $validated['birth_year'] ?? null,
             'birth_month' => $validated['birth_month'] ?? null,
@@ -389,17 +391,32 @@ class StampCardController extends Controller
 
         // 来店シナリオ: visit_scenario_sends に scheduled_at を積む
         $visitCount = (int) $newUser->visit_count;
+        $currentCardId = $newUser->current_card_id;
 
         $scenarios = DB::table('visit_scenarios')
             ->where('is_active', true)
-            ->where(function ($q) use ($visitCount) {
-                $q->where('visit_number', $visitCount)
-                  ->orWhere(function ($q2) use ($visitCount) {
-                      $q2->where('visit_number', 999)
-                         ->whereRaw('? >= 4', [$visitCount]);
-                  });
+            ->where('stamp_card_definition_id', $currentCardId)
+            ->where(function ($q) use ($visitCount, $newUser) {
+                // カード×スタンプ目 方式
+                $q->where(function ($q2) use ($newUser) {
+                    $q2->whereNotNull('stamp_number')
+                       ->where('stamp_number', (int)($newUser->card_progress));
+                })
+                // N回以降ずっと 方式
+                ->orWhere(function ($q2) use ($visitCount) {
+                    $q2->whereNull('stamp_number')
+                       ->whereNotNull('from_visit_count')
+                       ->whereRaw('? >= from_visit_count', [$visitCount]);
+                });
             })
             ->get();
+
+        // セグメントフィルター適用
+        $userSegment = $newUser->visit_frequency ?? null;
+        $scenarios = $scenarios->filter(function ($scenario) use ($userSegment) {
+            if (!$scenario->segment_filter) return true; // null = 全員
+            return $scenario->segment_filter === $userSegment;
+        });
 
         foreach ($scenarios as $scenario) {
             $scheduledAt = now()->addHours((int) ($scenario->delay_hours ?? 0));

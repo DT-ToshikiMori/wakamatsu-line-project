@@ -16,5 +16,8 @@ Schedule::command('messages:process-schedules')->everyMinute();
 // クーポン有効期限チェック（5分ごと）
 Schedule::command('coupons:expire')->everyFiveMinutes();
 
+// クーポン期限前リマインド（1時間ごと）
+Schedule::command('coupon:remind')->hourly();
+
 // 来店シナリオ通知バッチ（5分ごと）
 Schedule::command('visit-scenario:send')->everyFiveMinutes();

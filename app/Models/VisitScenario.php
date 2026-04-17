@@ -9,15 +9,17 @@ class VisitScenario extends Model
     protected $table = 'visit_scenarios';
 
     protected $fillable = [
-        'visit_number',
-        'coupon_template_id',
+        'stamp_card_definition_id',
+        'stamp_number',
+        'from_visit_count',
+        'segment_filter',
         'delay_hours',
         'expires_days',
         'is_active',
     ];
 
-    public function couponTemplate()
+    public function stampCardDefinition()
     {
-        return $this->belongsTo(CouponTemplate::class);
+        return $this->belongsTo(StampCardDefinition::class);
     }
 }

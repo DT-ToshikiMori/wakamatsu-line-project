@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\VisitScenarioResource\Pages;
+use App\Models\StampCardDefinition;
 use App\Models\VisitScenario;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -24,24 +25,32 @@ class VisitScenarioResource extends Resource
     public static function form(Form $form): Form
     {
         return $form->schema([
-            Forms\Components\Select::make('visit_number')
-                ->label('来店回数')
-                ->options([
-                    0 => '0回目（初回登録）',
-                    1 => '1回目来店',
-                    2 => '2回目来店',
-                    3 => '3回目来店',
-                    4 => '4回目来店',
-                    999 => '4回目以降ずっと（ゴールド）',
-                ])
+            Forms\Components\Select::make('stamp_card_definition_id')
+                ->label('スタンプカード')
+                ->options(StampCardDefinition::pluck('display_name', 'id'))
+                ->searchable()
                 ->required(),
 
-            Forms\Components\Select::make('coupon_template_id')
-                ->label('クーポンテンプレート')
-                ->relationship('couponTemplate', 'title')
-                ->searchable()
-                ->preload()
-                ->required(),
+            Forms\Components\TextInput::make('stamp_number')
+                ->label('スタンプ目（空欄の場合は来店回数指定）')
+                ->numeric()
+                ->minValue(1)
+                ->nullable(),
+
+            Forms\Components\TextInput::make('from_visit_count')
+                ->label('N回目以降ずっと（スタンプ目が空欄の時に使用）')
+                ->numeric()
+                ->minValue(1)
+                ->nullable(),
+
+            Forms\Components\Select::make('segment_filter')
+                ->label('対象セグメント（空欄=全員）')
+                ->options([
+                    'new' => 'はじめて',
+                    '2_3' => '2〜3回',
+                    '4plus' => '4回以上',
+                ])
+                ->nullable(),
 
             Forms\Components\TextInput::make('delay_hours')
                 ->label('何時間後に送るか')
@@ -66,34 +75,42 @@ class VisitScenarioResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('visit_number')
-                    ->label('来店回数')
-                    ->formatStateUsing(fn (int $state) => match ($state) {
-                        0 => '0回目（初回登録）',
-                        999 => '4回目以降ずっと（ゴールド）',
-                        default => "{$state}回目来店",
+                Tables\Columns\TextColumn::make('stampCardDefinition.display_name')
+                    ->label('カード名')
+                    ->searchable(),
+
+                Tables\Columns\TextColumn::make('stamp_number')
+                    ->label('スタンプ目 / N回以降')
+                    ->formatStateUsing(function ($state, $record) {
+                        if ($state !== null) {
+                            return "{$state}スタンプ目";
+                        }
+                        if ($record->from_visit_count !== null) {
+                            return "{$record->from_visit_count}回目以降";
+                        }
+                        return '-';
                     })
                     ->sortable(),
 
-                Tables\Columns\TextColumn::make('couponTemplate.title')
-                    ->label('クーポン')
-                    ->searchable(),
+                Tables\Columns\TextColumn::make('segment_filter')
+                    ->label('セグメント')
+                    ->formatStateUsing(fn ($state) => match ($state) {
+                        'new' => 'はじめて',
+                        '2_3' => '2〜3回',
+                        '4plus' => '4回以上',
+                        default => '全員',
+                    })
+                    ->sortable(),
 
                 Tables\Columns\TextColumn::make('delay_hours')
                     ->label('遅延（時間）')
                     ->suffix('h')
                     ->sortable(),
 
-                Tables\Columns\TextColumn::make('expires_days')
-                    ->label('有効期限（日）')
-                    ->suffix('日')
-                    ->placeholder('無期限')
-                    ->sortable(),
-
                 Tables\Columns\ToggleColumn::make('is_active')
                     ->label('有効'),
             ])
-            ->defaultSort('visit_number')
+            ->defaultSort('stamp_card_definition_id')
             ->actions([
                 Tables\Actions\EditAction::make(),
             ])
