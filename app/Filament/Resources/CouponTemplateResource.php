@@ -36,8 +36,8 @@ class CouponTemplateResource extends Resource
                 ->options([
                     'birthday' => '誕生日',
                     'inactive' => '離脱防止',
-                    'rank_up'  => 'ランクアップ',
-                    'stamp'    => 'スタンプ到達',
+                    // 'rank_up' => 'ランクアップ',  // 来店シナリオに移行
+                    // 'stamp'  => 'スタンプ到達',   // 来店シナリオに移行
                 ])
                 ->required()
                 ->live(),
@@ -97,18 +97,9 @@ class CouponTemplateResource extends Resource
                 ->minValue(0)->maxValue(59)
                 ->visible(fn ($get) => $get('type') === 'inactive'),
 
-            // スタンプ到達
-            Forms\Components\TextInput::make('required_stamps')
-                ->label('チェックイン回数A回で付与')
-                ->numeric()
-                ->visible(fn ($get) => $get('type') === 'stamp'),
-
-            // ランクアップ
-            Forms\Components\Select::make('rank_card_id')
-                ->label('対象ランク（rank_up用）')
-                ->relationship('rankCard', 'display_name')
-                ->searchable()
-                ->visible(fn ($get) => $get('type') === 'rank_up'),
+            // スタンプ到達・ランクアップは来店シナリオに移行したため非表示
+            // Forms\Components\TextInput::make('required_stamps') ...
+            // Forms\Components\Select::make('rank_card_id') ...
 
             Forms\Components\TextInput::make('reminder_hours_before_expiry')
                 ->label('期限前リマインド（時間前）空欄=なし')
