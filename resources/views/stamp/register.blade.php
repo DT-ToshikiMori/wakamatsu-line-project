@@ -210,12 +210,25 @@
 
       <div class="field">
         <label>生まれ年</label>
-        <select name="birth_year">
+        <select name="birth_year" id="birth_year">
           <option value="">選択しない</option>
           @for($y = date('Y'); $y >= 1920; $y--)
             <option value="{{ $y }}" {{ (int)old('birth_year') === $y ? 'selected' : '' }}>{{ $y }}年</option>
           @endfor
         </select>
+        <script>
+          (function() {
+            var sel = document.getElementById('birth_year');
+            sel.addEventListener('mousedown', function() {
+              if (!this.value) {
+                this.value = '1970';
+              }
+            });
+            sel.addEventListener('change', function() {
+              // 「選択しない」に戻したら空にする
+            });
+          })();
+        </script>
       </div>
 
       <div class="field">
