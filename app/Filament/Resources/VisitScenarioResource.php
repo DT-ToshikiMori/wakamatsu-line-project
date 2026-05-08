@@ -61,14 +61,18 @@ class VisitScenarioResource extends Resource
                 ->nullable()
                 ->hidden(fn ($get) => $get('trigger_type') !== 'after_days'),
 
+            Forms\Components\Placeholder::make('visit_count_help')
+                ->label('来店回数の設定')
+                ->content('「来店回数：最小」〜「来店回数：最大」で発火条件を設定します。' . "\n" . '例）1回目のみ: 最小=1, 最大=1 / 4回目以降ずっと: 最小=4, 最大=空欄（+毎回発火ON）'),
+
             Forms\Components\TextInput::make('visit_count_min')
-                ->label('来店回数: 最小（例: 1）')
+                ->label('来店回数：最小（例: 1回目以上）')
                 ->numeric()
                 ->minValue(0)
                 ->nullable(),
 
             Forms\Components\TextInput::make('visit_count_max')
-                ->label('来店回数: 最大（空欄=上限なし）')
+                ->label('来店回数：最大（空欄=上限なし）')
                 ->numeric()
                 ->minValue(0)
                 ->nullable(),
@@ -76,30 +80,6 @@ class VisitScenarioResource extends Resource
             Forms\Components\Toggle::make('repeat')
                 ->label('毎回発火する（OFFの場合は初回のみ）')
                 ->default(false),
-
-            Forms\Components\TextInput::make('stamp_number')
-                ->label('スタンプ目（空欄の場合は来店回数指定）')
-                ->helperText('旧方式 - 新規は上の来店回数範囲を使用')
-                ->numeric()
-                ->minValue(1)
-                ->nullable(),
-
-            Forms\Components\TextInput::make('from_visit_count')
-                ->label('N回目以降ずっと（スタンプ目が空欄の時に使用）')
-                ->helperText('旧方式 - 新規は上の来店回数範囲を使用')
-                ->numeric()
-                ->minValue(1)
-                ->nullable(),
-
-            Forms\Components\Select::make('segment_filter')
-                ->label('対象セグメント（空欄=全員）')
-                ->helperText('旧方式 - 新規は上の来店回数範囲を使用')
-                ->options([
-                    'new' => 'はじめて',
-                    '2_3' => '2〜3回',
-                    '4plus' => '4回以上',
-                ])
-                ->nullable(),
 
             Forms\Components\Select::make('coupon_template_id')
                 ->label('クーポンテンプレート')
@@ -171,24 +151,16 @@ class VisitScenarioResource extends Resource
                     })
                     ->sortable(),
 
-                Tables\Columns\TextColumn::make('stamp_number')
+                Tables\Columns\TextColumn::make('visit_count_min')
                     ->label('条件')
                     ->formatStateUsing(function ($state, $record) {
-                        // 新方式: visit_count_min/max
-                        if ($record->visit_count_min !== null) {
-                            $min = $record->visit_count_min;
+                        if ($state !== null) {
+                            $min = $state;
                             $max = $record->visit_count_max;
                             if ($max !== null) {
                                 return "{$min}〜{$max}回目";
                             }
                             return "{$min}回目〜";
-                        }
-                        // 旧方式
-                        if ($state !== null) {
-                            return "{$state}スタンプ目";
-                        }
-                        if ($record->from_visit_count !== null) {
-                            return "{$record->from_visit_count}回目以降";
                         }
                         return '-';
                     })
@@ -197,16 +169,6 @@ class VisitScenarioResource extends Resource
                 Tables\Columns\IconColumn::make('repeat')
                     ->label('毎回')
                     ->boolean()
-                    ->sortable(),
-
-                Tables\Columns\TextColumn::make('segment_filter')
-                    ->label('セグメント')
-                    ->formatStateUsing(fn ($state) => match ($state) {
-                        'new' => 'はじめて',
-                        '2_3' => '2〜3回',
-                        '4plus' => '4回以上',
-                        default => '全員',
-                    })
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('couponTemplate.title')
