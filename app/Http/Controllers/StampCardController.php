@@ -397,37 +397,71 @@ class StampCardController extends Controller
             ->where('is_active', true)
             ->where('stamp_card_definition_id', $currentCardId)
             ->where(function ($q) use ($visitCount, $newUser) {
-                // カード×スタンプ目 方式
-                $q->where(function ($q2) use ($newUser) {
-                    $q2->whereNotNull('stamp_number')
-                       ->where('stamp_number', (int)($newUser->card_progress));
+                // 新フィールド優先: trigger_type=checkin かつ visit_count_min/max で範囲マッチ
+                $q->where(function ($q2) use ($visitCount) {
+                    $q2->whereNotNull('visit_count_min')
+                       ->where('visit_count_min', '<=', $visitCount)
+                       ->where(function ($q3) use ($visitCount) {
+                           $q3->whereNull('visit_count_max')
+                              ->orWhere('visit_count_max', '>=', $visitCount);
+                       });
                 })
-                // N回以降ずっと 方式
-                ->orWhere(function ($q2) use ($visitCount) {
-                    $q2->whereNull('stamp_number')
-                       ->whereNotNull('from_visit_count')
-                       ->whereRaw('? >= from_visit_count', [$visitCount]);
+                // 旧フィールドフォールバック: visit_count_min が null の場合
+                ->orWhere(function ($q2) use ($visitCount, $newUser) {
+                    $q2->whereNull('visit_count_min')
+                       ->where(function ($q3) use ($visitCount, $newUser) {
+                           // stamp_number 方式
+                           $q3->where(function ($q4) use ($newUser) {
+                               $q4->whereNotNull('stamp_number')
+                                  ->where('stamp_number', (int)($newUser->card_progress));
+                           })
+                           // from_visit_count 方式
+                           ->orWhere(function ($q4) use ($visitCount) {
+                               $q4->whereNull('stamp_number')
+                                  ->whereNotNull('from_visit_count')
+                                  ->whereRaw('? >= from_visit_count', [$visitCount]);
+                           });
+                       });
                 });
             })
             ->get();
 
-        // セグメントフィルター適用
+        // trigger_type フィルター: 新フィールドを使うシナリオは checkin のみ
+        $scenarios = $scenarios->filter(function ($scenario) {
+            $triggerType = $scenario->trigger_type ?? 'checkin';
+            return $triggerType === 'checkin';
+        });
+
+        // セグメントフィルター適用（既存ロジック維持）
         $userSegment = $newUser->visit_frequency ?? null;
         $scenarios = $scenarios->filter(function ($scenario) use ($userSegment) {
-            if (!$scenario->segment_filter) return true; // null = 全員
+            if (!$scenario->segment_filter) return true;
             return $scenario->segment_filter === $userSegment;
         });
 
         foreach ($scenarios as $scenario) {
+            $repeat = (bool) ($scenario->repeat ?? false);
+
+            // repeat=false の場合: すでに送信記録があればスキップ
+            if (!$repeat) {
+                $alreadySent = DB::table('visit_scenario_sends')
+                    ->where('user_id', $user->id)
+                    ->where('scenario_id', $scenario->id)
+                    ->exists();
+                if ($alreadySent) {
+                    continue;
+                }
+            }
+
             $scheduledAt = now()->addHours((int) ($scenario->delay_hours ?? 0));
             DB::table('visit_scenario_sends')->insert([
-                'user_id'      => $user->id,
-                'scenario_id'  => $scenario->id,
-                'scheduled_at' => $scheduledAt,
-                'sent_at'      => null,
+                'user_id'          => $user->id,
+                'scenario_id'      => $scenario->id,
+                'scheduled_at'     => $scheduledAt,
+                'sent_at'          => null,
                 'coupon_issued_at' => null,
-                'created_at'   => now(),
-                'updated_at'   => now(),
+                'created_at'       => now(),
+                'updated_at'       => now(),
             ]);
         }
 

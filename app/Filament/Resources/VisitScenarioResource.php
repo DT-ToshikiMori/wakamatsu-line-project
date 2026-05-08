@@ -25,26 +25,58 @@ class VisitScenarioResource extends Resource
     public static function form(Form $form): Form
     {
         return $form->schema([
+            Forms\Components\TextInput::make('name')
+                ->label('シナリオ名（管理用）')
+                ->nullable(),
+
             Forms\Components\Select::make('stamp_card_definition_id')
                 ->label('スタンプカード')
                 ->options(StampCardDefinition::pluck('display_name', 'id'))
                 ->searchable()
                 ->required(),
 
+            Forms\Components\Select::make('trigger_type')
+                ->label('発火タイミング')
+                ->options([
+                    'checkin' => '来店スタンプ時',
+                    'migration' => 'LINE移行時（0回目）',
+                ])
+                ->default('checkin')
+                ->required(),
+
+            Forms\Components\TextInput::make('visit_count_min')
+                ->label('来店回数: 最小（例: 1）')
+                ->numeric()
+                ->minValue(0)
+                ->nullable(),
+
+            Forms\Components\TextInput::make('visit_count_max')
+                ->label('来店回数: 最大（空欄=上限なし）')
+                ->numeric()
+                ->minValue(0)
+                ->nullable(),
+
+            Forms\Components\Toggle::make('repeat')
+                ->label('毎回発火する（OFFの場合は初回のみ）')
+                ->default(false),
+
             Forms\Components\TextInput::make('stamp_number')
                 ->label('スタンプ目（空欄の場合は来店回数指定）')
+                ->helperText('旧方式 - 新規は上の来店回数範囲を使用')
                 ->numeric()
                 ->minValue(1)
                 ->nullable(),
 
             Forms\Components\TextInput::make('from_visit_count')
                 ->label('N回目以降ずっと（スタンプ目が空欄の時に使用）')
+                ->helperText('旧方式 - 新規は上の来店回数範囲を使用')
                 ->numeric()
                 ->minValue(1)
                 ->nullable(),
 
             Forms\Components\Select::make('segment_filter')
                 ->label('対象セグメント（空欄=全員）')
+                ->helperText('旧方式 - 新規は上の来店回数範囲を使用')
                 ->options([
                     'new' => 'はじめて',
                     '2_3' => '2〜3回',
@@ -82,13 +114,36 @@ class VisitScenarioResource extends Resource
     {
         return $table
             ->columns([
+                Tables\Columns\TextColumn::make('name')
+                    ->label('シナリオ名')
+                    ->searchable(),
+
                 Tables\Columns\TextColumn::make('stampCardDefinition.display_name')
                     ->label('カード名')
                     ->searchable(),
 
+                Tables\Columns\TextColumn::make('trigger_type')
+                    ->label('発火')
+                    ->formatStateUsing(fn ($state) => match ($state) {
+                        'checkin' => '来店時',
+                        'migration' => 'LINE移行時',
+                        default => '来店時',
+                    })
+                    ->sortable(),
+
                 Tables\Columns\TextColumn::make('stamp_number')
-                    ->label('スタンプ目 / N回以降')
+                    ->label('条件')
                     ->formatStateUsing(function ($state, $record) {
+                        // 新方式: visit_count_min/max
+                        if ($record->visit_count_min !== null) {
+                            $min = $record->visit_count_min;
+                            $max = $record->visit_count_max;
+                            if ($max !== null) {
+                                return "{$min}〜{$max}回目";
+                            }
+                            return "{$min}回目〜";
+                        }
+                        // 旧方式
                         if ($state !== null) {
                             return "{$state}スタンプ目";
                         }
@@ -97,6 +152,11 @@ class VisitScenarioResource extends Resource
                         }
                         return '-';
                     })
+                    ->sortable(),
+
+                Tables\Columns\IconColumn::make('repeat')
+                    ->label('毎回')
+                    ->boolean()
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('segment_filter')
