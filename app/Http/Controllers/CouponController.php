@@ -328,11 +328,26 @@ class CouponController extends Controller
             'created_at' => $now,
         ]);
 
-        // coupon_issued_at を更新
+        // リマインドスケジュール計算
+        $reminderScheduledAt = null;
+        if ($scenario->reminder_enabled && $expiresAt) {
+            $reminderHour = (int) ($scenario->reminder_hour ?? 10);
+            $reminderBeforeDays = (int) ($scenario->reminder_before_days ?? 3);
+            $reminderScheduledAt = $expiresAt->copy()
+                ->subDays($reminderBeforeDays)
+                ->startOfDay()
+                ->addHours($reminderHour);
+            if ($reminderScheduledAt->isPast()) {
+                $reminderScheduledAt = null;
+            }
+        }
+
         DB::table('visit_scenario_sends')
             ->where('id', $send->id)
             ->update([
                 'coupon_issued_at' => $now,
+                'user_coupon_id' => $userCouponId,
+                'reminder_scheduled_at' => $reminderScheduledAt,
                 'updated_at' => $now,
             ]);
     }

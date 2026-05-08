@@ -17,6 +17,8 @@ class ChurnScenarioResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-chat-bubble-left-right';
 
+    protected static bool $shouldRegisterNavigation = false;
+
     protected static ?string $navigationGroup = 'メッセージ管理';
     protected static ?string $navigationLabel = '離脱防止シナリオ';
     protected static ?string $modelLabel = 'シナリオ';

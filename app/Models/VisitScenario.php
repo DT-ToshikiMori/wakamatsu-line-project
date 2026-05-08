@@ -22,6 +22,11 @@ class VisitScenario extends Model
         'expires_days',
         'is_active',
         'trigger_type',
+        'trigger_days',
+        'send_hour',
+        'reminder_enabled',
+        'reminder_before_days',
+        'reminder_hour',
     ];
 
     public function stampCardDefinition()

@@ -40,9 +40,26 @@ class VisitScenarioResource extends Resource
                 ->options([
                     'checkin' => '来店スタンプ時',
                     'migration' => 'LINE移行時（0回目）',
+                    'after_days' => '最終来店からN日後（離脱防止）',
                 ])
                 ->default('checkin')
-                ->required(),
+                ->required()
+                ->live(),
+
+            Forms\Components\TextInput::make('trigger_days')
+                ->label('最終来店からX日後（after_days用）')
+                ->numeric()
+                ->minValue(1)
+                ->nullable()
+                ->hidden(fn ($get) => $get('trigger_type') !== 'after_days'),
+
+            Forms\Components\TextInput::make('send_hour')
+                ->label('送信時刻（時・after_days用）')
+                ->numeric()
+                ->minValue(0)
+                ->maxValue(23)
+                ->nullable()
+                ->hidden(fn ($get) => $get('trigger_type') !== 'after_days'),
 
             Forms\Components\TextInput::make('visit_count_min')
                 ->label('来店回数: 最小（例: 1）')
@@ -104,6 +121,28 @@ class VisitScenarioResource extends Resource
                 ->minValue(1)
                 ->nullable(),
 
+            Forms\Components\Section::make('有効期限リマインド')
+                ->schema([
+                    Forms\Components\Toggle::make('reminder_enabled')
+                        ->label('リマインドを送る')
+                        ->default(false)
+                        ->live(),
+                    Forms\Components\TextInput::make('reminder_before_days')
+                        ->label('期限N日前に送る')
+                        ->numeric()
+                        ->minValue(1)
+                        ->nullable()
+                        ->hidden(fn ($get) => !$get('reminder_enabled')),
+                    Forms\Components\TextInput::make('reminder_hour')
+                        ->label('送信時刻（時・0-23）')
+                        ->numeric()
+                        ->minValue(0)
+                        ->maxValue(23)
+                        ->default(10)
+                        ->hidden(fn ($get) => !$get('reminder_enabled')),
+                ])
+                ->collapsible(),
+
             Forms\Components\Toggle::make('is_active')
                 ->label('有効')
                 ->default(true),
@@ -127,6 +166,7 @@ class VisitScenarioResource extends Resource
                     ->formatStateUsing(fn ($state) => match ($state) {
                         'checkin' => '来店時',
                         'migration' => 'LINE移行時',
+                        'after_days' => '離脱防止',
                         default => '来店時',
                     })
                     ->sortable(),
@@ -176,6 +216,11 @@ class VisitScenarioResource extends Resource
                 Tables\Columns\TextColumn::make('delay_hours')
                     ->label('遅延（時間）')
                     ->suffix('h')
+                    ->sortable(),
+
+                Tables\Columns\IconColumn::make('reminder_enabled')
+                    ->label('リマインド')
+                    ->boolean()
                     ->sortable(),
 
                 Tables\Columns\ToggleColumn::make('is_active')

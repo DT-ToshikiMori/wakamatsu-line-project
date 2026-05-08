@@ -9,7 +9,8 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 // メッセージ配信スケジュール
-Schedule::command('messages:process-churn')->everyMinute();
+// Schedule::command('messages:process-churn')->everyMinute(); // 統合済み → visit-scenario:process-after-days へ
+Schedule::command('visit-scenario:process-after-days')->everyMinute();
 Schedule::command('messages:process-broadcasts')->everyMinute();
 Schedule::command('messages:process-schedules')->everyMinute();
 

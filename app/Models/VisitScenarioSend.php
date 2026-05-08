@@ -14,12 +14,17 @@ class VisitScenarioSend extends Model
         'scheduled_at',
         'sent_at',
         'coupon_issued_at',
+        'user_coupon_id',
+        'reminder_scheduled_at',
+        'reminder_sent_at',
     ];
 
     protected $casts = [
         'scheduled_at' => 'datetime',
         'sent_at' => 'datetime',
         'coupon_issued_at' => 'datetime',
+        'reminder_scheduled_at' => 'datetime',
+        'reminder_sent_at' => 'datetime',
     ];
 
     public function scenario()

@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\CouponTemplate;
 use App\Services\LineBotService;
+use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -31,6 +32,9 @@ class SendVisitScenarioBatch extends Command
         foreach ($grouped as $scenarioId => $sends) {
             $this->processScenarioGroup($lineBot, (int) $scenarioId, $sends);
         }
+
+        // リマインド処理
+        $this->processReminders($lineBot);
 
         return self::SUCCESS;
     }
@@ -188,6 +192,144 @@ class SendVisitScenarioBatch extends Command
                         ],
                     ],
                 ],
+                'flex' => 0,
+            ],
+        ];
+
+        if ($imageUrl) {
+            $bubble['hero'] = [
+                'type' => 'image',
+                'url' => $imageUrl,
+                'size' => 'full',
+                'aspectRatio' => '7:3',
+                'aspectMode' => 'cover',
+            ];
+        }
+
+        return $bubble;
+    }
+
+    private function processReminders(LineBotService $lineBot): void
+    {
+        $pendingReminders = DB::table('visit_scenario_sends as vss')
+            ->join('visit_scenarios as vs', 'vs.id', '=', 'vss.scenario_id')
+            ->join('user_coupons as uc', 'uc.id', '=', 'vss.user_coupon_id')
+            ->join('coupon_templates as ct', 'ct.id', '=', 'uc.coupon_template_id')
+            ->join('users as u', 'u.id', '=', 'vss.user_id')
+            ->where('vs.reminder_enabled', true)
+            ->whereNotNull('vss.reminder_scheduled_at')
+            ->where('vss.reminder_scheduled_at', '<=', now())
+            ->whereNull('vss.reminder_sent_at')
+            ->whereNotNull('vss.user_coupon_id')
+            ->where('uc.status', 'issued')
+            ->whereNotNull('u.line_user_id')
+            ->select([
+                'vss.id as send_id',
+                'u.line_user_id',
+                'ct.title',
+                'ct.image_url',
+                'uc.expires_at',
+            ])
+            ->get();
+
+        if ($pendingReminders->isEmpty()) {
+            return;
+        }
+
+        $liffId = config('services.line.liff_id');
+        $liffUrl = "https://liff.line.me/{$liffId}/coupons?remind=1";
+
+        foreach ($pendingReminders as $reminder) {
+            $daysLeft = $reminder->expires_at
+                ? (int) now()->diffInDays(Carbon::parse($reminder->expires_at), false)
+                : null;
+
+            $imageUrl = CouponTemplate::resolveImageUrl($reminder->image_url);
+            $flexContents = $this->buildReminderFlexBubble(
+                $reminder->title,
+                $daysLeft,
+                $imageUrl,
+                $liffUrl
+            );
+
+            $messages = [[
+                'type' => 'flex',
+                'altText' => "クーポンの期限が近づいています: {$reminder->title}",
+                'contents' => $flexContents,
+            ]];
+
+            try {
+                $lineBot->multicast([$reminder->line_user_id], $messages);
+            } catch (\Throwable $e) {
+                Log::error('Reminder send failed', ['send_id' => $reminder->send_id, 'error' => $e->getMessage()]);
+            }
+
+            DB::table('visit_scenario_sends')
+                ->where('id', $reminder->send_id)
+                ->update(['reminder_sent_at' => now(), 'updated_at' => now()]);
+        }
+
+        $this->info("Reminders sent: {$pendingReminders->count()}");
+    }
+
+    private function buildReminderFlexBubble(string $title, ?int $daysLeft, ?string $imageUrl, string $url): array
+    {
+        $daysText = $daysLeft !== null ? "あと{$daysLeft}日" : 'まもなく期限切れ';
+
+        $bodyContents = [
+            [
+                'type' => 'text',
+                'text' => "\u{23F0} クーポンの期限が近づいています",
+                'weight' => 'bold',
+                'size' => 'sm',
+                'color' => '#e74c3c',
+            ],
+            [
+                'type' => 'text',
+                'text' => $title,
+                'weight' => 'bold',
+                'size' => 'xl',
+                'margin' => 'md',
+            ],
+            [
+                'type' => 'box',
+                'layout' => 'vertical',
+                'margin' => 'lg',
+                'spacing' => 'sm',
+                'contents' => [[
+                    'type' => 'box',
+                    'layout' => 'baseline',
+                    'spacing' => 'sm',
+                    'contents' => [
+                        ['type' => 'text', 'text' => '有効期限', 'color' => '#aaaaaa', 'size' => 'sm', 'flex' => 2],
+                        ['type' => 'text', 'text' => $daysText, 'wrap' => true, 'color' => '#e74c3c', 'size' => 'sm', 'flex' => 5],
+                    ],
+                ]],
+            ],
+        ];
+
+        $bubble = [
+            'type' => 'bubble',
+            'body' => [
+                'type' => 'box',
+                'layout' => 'vertical',
+                'contents' => $bodyContents,
+            ],
+            'footer' => [
+                'type' => 'box',
+                'layout' => 'vertical',
+                'spacing' => 'sm',
+                'contents' => [[
+                    'type' => 'button',
+                    'style' => 'primary',
+                    'color' => '#e74c3c',
+                    'height' => 'sm',
+                    'action' => [
+                        'type' => 'uri',
+                        'label' => 'クーポンを確認する',
+                        'uri' => $url,
+                    ],
+                ]],
                 'flex' => 0,
             ],
         ];
