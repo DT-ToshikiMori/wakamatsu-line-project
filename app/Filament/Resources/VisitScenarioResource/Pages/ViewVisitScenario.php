@@ -6,11 +6,14 @@ use App\Filament\Resources\VisitScenarioResource;
 use Filament\Actions\EditAction;
 use Filament\Resources\Pages\ViewRecord;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class ViewVisitScenario extends ViewRecord
 {
     protected static string $resource = VisitScenarioResource::class;
     protected static string $view     = 'filament.pages.visit-scenario-analytics';
+
+    private ?bool $visitScenarioSendsHasUserCouponId = null;
 
     protected function getHeaderActions(): array
     {
@@ -28,6 +31,10 @@ class ViewVisitScenario extends ViewRecord
 
     public function getHasCouponProperty(): bool
     {
+        if ($this->record->coupon_template_id !== null) {
+            return true;
+        }
+
         return DB::table('message_bubbles')
             ->where('parent_type', 'visit_scenario')
             ->where('parent_id', $this->record->id)
@@ -53,9 +60,17 @@ class ViewVisitScenario extends ViewRecord
                 ->whereIn('message_bubble_id', $bubbleIds)
                 ->count();
         }
+
+        if ($this->visitScenarioSendsHasUserCouponId()) {
+            return DB::table('visit_scenario_sends')
+                ->where('scenario_id', $this->record->id)
+                ->whereNotNull('user_coupon_id')
+                ->count();
+        }
+
         return DB::table('visit_scenario_sends')
             ->where('scenario_id', $this->record->id)
-            ->whereNotNull('user_coupon_id')
+            ->whereNotNull('coupon_issued_at')
             ->count();
     }
 
@@ -70,6 +85,11 @@ class ViewVisitScenario extends ViewRecord
                 ->where('status', 'used')
                 ->count();
         }
+
+        if (!$this->visitScenarioSendsHasUserCouponId()) {
+            return 0;
+        }
+
         $couponIds = DB::table('visit_scenario_sends')
             ->where('scenario_id', $this->record->id)
             ->whereNotNull('user_coupon_id')
@@ -101,7 +121,7 @@ class ViewVisitScenario extends ViewRecord
             ->where('scenario_id', $scenarioId)
             ->whereNotNull('sent_at')
             ->where('sent_at', '>=', now()->subMonths(6)->startOfMonth())
-            ->selectRaw("strftime('%Y-%m', sent_at) as ym, count(*) as cnt")
+            ->selectRaw($this->monthKeyExpression('sent_at') . ' as ym, count(*) as cnt')
             ->groupBy('ym')
             ->pluck('cnt', 'ym');
 
@@ -112,7 +132,15 @@ class ViewVisitScenario extends ViewRecord
                 $claimedRaw = DB::table('user_coupons')
                     ->whereIn('message_bubble_id', $bubbleIds)
                     ->where('created_at', '>=', now()->subMonths(6)->startOfMonth())
-                    ->selectRaw("strftime('%Y-%m', created_at) as ym, count(*) as cnt")
+                    ->selectRaw($this->monthKeyExpression('created_at') . ' as ym, count(*) as cnt')
+                    ->groupBy('ym')
+                    ->pluck('cnt', 'ym');
+            } else {
+                $claimedRaw = DB::table('visit_scenario_sends')
+                    ->where('scenario_id', $scenarioId)
+                    ->whereNotNull('coupon_issued_at')
+                    ->where('coupon_issued_at', '>=', now()->subMonths(6)->startOfMonth())
+                    ->selectRaw($this->monthKeyExpression('coupon_issued_at') . ' as ym, count(*) as cnt')
                     ->groupBy('ym')
                     ->pluck('cnt', 'ym');
             }
@@ -131,6 +159,21 @@ class ViewVisitScenario extends ViewRecord
             ];
         }
         return $rows;
+    }
+
+    private function monthKeyExpression(string $column): string
+    {
+        return match (DB::connection()->getDriverName()) {
+            'pgsql' => "to_char({$column}, 'YYYY-MM')",
+            'mysql', 'mariadb' => "date_format({$column}, '%Y-%m')",
+            'sqlsrv' => "format({$column}, 'yyyy-MM')",
+            default => "strftime('%Y-%m', {$column})",
+        };
+    }
+
+    private function visitScenarioSendsHasUserCouponId(): bool
+    {
+        return $this->visitScenarioSendsHasUserCouponId ??= Schema::hasColumn('visit_scenario_sends', 'user_coupon_id');
     }
 
     private function getBubbleIds()
