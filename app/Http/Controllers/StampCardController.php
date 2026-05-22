@@ -261,6 +261,8 @@ class StampCardController extends Controller
         $requestId = 'qr_' . bin2hex(random_bytes(8));
 
         $rankUpResults = [];
+        $issuedCoupon = null;
+        $lotteryResult = null;
         $currentCardBeforeUpgrade = null;
 
         DB::transaction(function () use ($store, $user, $visitedAt, $requestId, $stampCount, $qrLinkId, &$rankUpResults, &$currentCardBeforeUpgrade) {
