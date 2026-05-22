@@ -173,7 +173,7 @@ class SendCouponReminderBatch extends Command
                 'type' => 'image',
                 'url' => $imageUrl,
                 'size' => 'full',
-                'aspectRatio' => '7:3',
+                'aspectRatio' => '20:20',
                 'aspectMode' => 'cover',
             ];
         }
