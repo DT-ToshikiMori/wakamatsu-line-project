@@ -41,6 +41,9 @@ class CouponTemplateResource extends Resource
                 ->required()
                 ->live(),
 
+            Forms\Components\Hidden::make('type')
+                ->default('stamp'),
+
             Forms\Components\TextInput::make('title')
                 ->label('タイトル')
                 ->required()
