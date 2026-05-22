@@ -189,7 +189,7 @@ class MessageService
                 'type' => 'image',
                 'url' => $imageUrl,
                 'size' => 'full',
-                'aspectRatio' => '20:20',
+                'aspectRatio' => '1:1',
                 'aspectMode' => 'cover',
             ];
         }

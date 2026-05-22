@@ -240,7 +240,7 @@ class SendVisitScenarioBatch extends Command
         ];
 
         if ($imageUrl) {
-            $bubble['hero'] = ['type' => 'image', 'url' => $imageUrl, 'size' => 'full', 'aspectRatio' => '20:20', 'aspectMode' => 'cover'];
+            $bubble['hero'] = ['type' => 'image', 'url' => $imageUrl, 'size' => 'full', 'aspectRatio' => '1:1', 'aspectMode' => 'cover'];
         }
 
         return $bubble;
@@ -416,7 +416,7 @@ class SendVisitScenarioBatch extends Command
         ];
 
         if ($imageUrl) {
-            $bubble['hero'] = ['type' => 'image', 'url' => $imageUrl, 'size' => 'full', 'aspectRatio' => '20:20', 'aspectMode' => 'cover'];
+            $bubble['hero'] = ['type' => 'image', 'url' => $imageUrl, 'size' => 'full', 'aspectRatio' => '1:1', 'aspectMode' => 'cover'];
         }
 
         return $bubble;
