@@ -272,6 +272,13 @@ class CouponController extends Controller
      */
     private function claimScenarioCoupon(object $user, int $scenarioId): void
     {
+        DB::transaction(function () use ($user, $scenarioId): void {
+            $this->claimScenarioCouponInTransaction($user, $scenarioId);
+        });
+    }
+
+    private function claimScenarioCouponInTransaction(object $user, int $scenarioId): void
+    {
         // 未発行の送信レコードを確認（二重発行防止: coupon_issued_at IS NULL）
         $send = DB::table('visit_scenario_sends')
             ->where('user_id', $user->id)
@@ -279,6 +286,7 @@ class CouponController extends Controller
             ->whereNotNull('sent_at')
             ->whereNull('coupon_issued_at')
             ->orderByDesc('id')
+            ->lockForUpdate()
             ->first();
 
         if (!$send) {
@@ -293,8 +301,25 @@ class CouponController extends Controller
             return;
         }
 
+        // 新方式: message_bubbles のクーポン設定を優先。旧方式は scenario の coupon_template_id を使う。
+        $bubble = DB::table('message_bubbles as mb')
+            ->join('coupon_templates as ct', 'ct.id', '=', 'mb.coupon_template_id')
+            ->where('mb.parent_type', 'visit_scenario')
+            ->where('mb.parent_id', $scenarioId)
+            ->where('mb.bubble_type', 'coupon')
+            ->where('ct.is_active', true)
+            ->orderBy('mb.position')
+            ->orderBy('mb.id')
+            ->select('mb.*')
+            ->first();
+
+        $tplId = $bubble?->coupon_template_id ?? $scenario->coupon_template_id;
+        if (!$tplId) {
+            return;
+        }
+
         $tpl = DB::table('coupon_templates')
-            ->where('id', $scenario->coupon_template_id)
+            ->where('id', $tplId)
             ->where('is_active', true)
             ->first();
 
@@ -303,11 +328,10 @@ class CouponController extends Controller
         }
 
         $now = now();
-        $expiresAt = $scenario->expires_days
-            ? $now->copy()->addDays((int) $scenario->expires_days)
-            : null;
+        $expiresAt = $this->calculateScenarioCouponExpiresAt($scenario, $bubble, $now);
 
-        // クーポン発行
+        // 来店シナリオは同じバブルを繰り返し送る可能性があるため、
+        // user_coupons.message_bubble_id の一意制約ではなく visit_scenario_sends.user_coupon_id で送信単位に紐づける。
         $userCouponId = DB::table('user_coupons')->insertGetId([
             'store_id' => null,
             'user_id' => $user->id,
@@ -328,6 +352,17 @@ class CouponController extends Controller
             'created_at' => $now,
         ]);
 
+        $this->markScenarioCouponIssued($send->id, $scenario, $userCouponId, $now, $expiresAt, $now);
+    }
+
+    private function markScenarioCouponIssued(
+        int $sendId,
+        object $scenario,
+        int $userCouponId,
+        Carbon $couponIssuedAt,
+        ?Carbon $expiresAt,
+        Carbon $updatedAt
+    ): void {
         // リマインドスケジュール計算
         $reminderScheduledAt = null;
         if ($scenario->reminder_enabled && $expiresAt) {
@@ -343,13 +378,30 @@ class CouponController extends Controller
         }
 
         DB::table('visit_scenario_sends')
-            ->where('id', $send->id)
+            ->where('id', $sendId)
+            ->whereNull('coupon_issued_at')
             ->update([
-                'coupon_issued_at' => $now,
+                'coupon_issued_at' => $couponIssuedAt,
                 'user_coupon_id' => $userCouponId,
                 'reminder_scheduled_at' => $reminderScheduledAt,
-                'updated_at' => $now,
+                'updated_at' => $updatedAt,
             ]);
+    }
+
+    private function calculateScenarioCouponExpiresAt(object $scenario, ?object $bubble, Carbon $issuedAt): ?Carbon
+    {
+        if ($bubble) {
+            if (!empty($bubble->coupon_expires_at)) {
+                return Carbon::parse($bubble->coupon_expires_at);
+            }
+            if (!empty($bubble->coupon_expires_days)) {
+                return $issuedAt->copy()->addDays((int) $bubble->coupon_expires_days);
+            }
+        }
+
+        return $scenario->expires_days
+            ? $issuedAt->copy()->addDays((int) $scenario->expires_days)
+            : null;
     }
 
     private function calculateExpiresAt(object $bubble, int $sentAt): ?Carbon
