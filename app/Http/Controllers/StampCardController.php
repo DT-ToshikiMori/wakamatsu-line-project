@@ -60,9 +60,28 @@ class StampCardController extends Controller
             }
         }
 
-        // 未登録項目あり → 登録フォームへリダイレクト
+        // 未登録項目あり → 登録フォームへリダイレクト（qr_link_id を引き継ぐ）
         if ($user->gender === null || $user->visit_frequency === null) {
-            return redirect("/s/{$store}/register");
+            $qrParam = $req->integer('qr_link_id') ? '?qr_link_id=' . $req->integer('qr_link_id') : '';
+            return redirect("/s/{$store}/register{$qrParam}");
+        }
+
+        // QRスキャン自動チェックイン
+        // qr_link_id があり、stamped=1 でなく、直近5分以内の重複スキャンでなければ実行
+        $qrLinkId = $req->integer('qr_link_id');
+        if ($qrLinkId && !$req->boolean('stamped')) {
+            $recentVisit = DB::table('visits')
+                ->where('user_id', $user->id)
+                ->where('qr_link_id', $qrLinkId)
+                ->where('visited_at', '>=', now()->subMinutes(5))
+                ->exists();
+
+            if (!$recentVisit) {
+                $this->performCheckin($store, $user, $lineUserId, $qrLinkId);
+            }
+
+            // stamped=1 を付けてリダイレクト（重複実行防止）
+            return redirect("/s/{$store}/card?ok=1&stamped=1");
         }
 
         // ① ランク定義（グローバル、priority順）
@@ -198,10 +217,39 @@ class StampCardController extends Controller
             ->first();
         abort_if(!$user, 404, 'user not found');
 
+        $qrLinkId = $req->input('qr_link_id');
+        $result = $this->performCheckin($store, $user, $lineUserId, $qrLinkId ? (int)$qrLinkId : null);
+
+        if ($req->expectsJson()) {
+            $response = [
+                'ok'              => true,
+                'stamp_total'     => (int) $result['newUser']->stamp_total,
+                'card_progress'   => (int) $result['newUser']->card_progress,
+                'current_card_id' => $result['newUser']->current_card_id,
+                'visit_count'     => (int) $result['newUser']->visit_count,
+                'last_visit_at'   => (string) $result['newUser']->last_visit_at,
+                'upgraded_to_gold'  => !empty($result['rankUpResults']),
+                'upgraded_to'       => $result['upgradedToDisplayName'],
+                'issued_coupon'     => $result['issuedCoupon'],
+            ];
+            if ($result['lotteryResult']) {
+                $response['lottery'] = $result['lotteryResult'];
+            }
+            return response()->json($response);
+        }
+
+        return redirect("/s/{$store}/card");
+    }
+
+    /**
+     * チェックイン処理の共通ロジック
+     * - QRスキャン時の自動チェックイン
+     * - POST /checkin API からも呼ばれる
+     */
+    private function performCheckin(int $store, object $user, string $lineUserId, ?int $qrLinkId): array
+    {
         // QRリンクから stamp_count を取得（デフォルト1）
         $stampCount = 1;
-        $qrLinkId = $req->input('qr_link_id');
-        $qrLink = null;
         if ($qrLinkId) {
             $qrLink = DB::table('store_qr_links')->where('id', $qrLinkId)->first();
             if ($qrLink) {
@@ -210,11 +258,9 @@ class StampCardController extends Controller
         }
 
         $visitedAt = now();
-        $requestId = 'card_' . bin2hex(random_bytes(8));
+        $requestId = 'qr_' . bin2hex(random_bytes(8));
 
         $rankUpResults = [];
-        $issuedCoupon = null;
-        $lotteryResult = null;
         $currentCardBeforeUpgrade = null;
 
         DB::transaction(function () use ($store, $user, $visitedAt, $requestId, $stampCount, $qrLinkId, &$rankUpResults, &$currentCardBeforeUpgrade) {
@@ -465,27 +511,13 @@ class StampCardController extends Controller
             ]);
         }
 
-        if ($req->expectsJson()) {
-            $response = [
-                'ok' => true,
-                'stamp_total' => (int) $newUser->stamp_total,
-                'card_progress' => (int) $newUser->card_progress,
-                'current_card_id' => $newUser->current_card_id,
-                'visit_count' => (int) $newUser->visit_count,
-                'last_visit_at' => (string) $newUser->last_visit_at,
-                'upgraded_to_gold' => !empty($rankUpResults),
-                'upgraded_to' => $upgradedToDisplayName,
-                'issued_coupon' => $issuedCoupon,
-            ];
-
-            if ($lotteryResult) {
-                $response['lottery'] = $lotteryResult;
-            }
-
-            return response()->json($response);
-        }
-
-        return redirect("/s/{$store}/card");
+        return [
+            'newUser'               => $newUser,
+            'rankUpResults'         => $rankUpResults,
+            'issuedCoupon'          => $issuedCoupon,
+            'lotteryResult'         => $lotteryResult,
+            'upgradedToDisplayName' => $upgradedToDisplayName,
+        ];
     }
 
     /**
