@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\StoreQrLinkResource\Pages;
 use App\Filament\Resources\StoreQrLinkResource\RelationManagers;
+use App\Models\Store;
 use App\Models\StoreQrLink;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -30,23 +31,15 @@ class StoreQrLinkResource extends Resource
             Forms\Components\Hidden::make('shop_id')
                 ->default(1),
 
-            Forms\Components\Select::make('store_id')
+            Forms\Components\Radio::make('store_id')
                 ->label('店舗')
-                ->relationship('store', 'name')
-                ->searchable()
+                ->options(fn () => Store::query()->pluck('name', 'id')->all())
                 ->required(),
 
             Forms\Components\TextInput::make('name')
                 ->label('QR名')
                 ->required()
                 ->maxLength(255),
-
-            Forms\Components\TextInput::make('slug')
-                ->label('Slug（URL識別子）')
-                ->required()
-                ->unique(ignoreRecord: true)
-                ->maxLength(255)
-                ->helperText('例：dt-test-front（英数字とハイフン推奨）'),
 
             Forms\Components\TextInput::make('stamp_count')
                 ->label('スタンプ付与数')
