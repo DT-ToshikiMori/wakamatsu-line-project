@@ -6,6 +6,7 @@ use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
+use Filament\Navigation\NavigationGroup;
 use Filament\Pages;
 use Filament\Panel;
 use Filament\PanelProvider;
@@ -31,6 +32,16 @@ class AdminPanelProvider extends PanelProvider
             ->authGuard('admin')
             ->colors([
                 'primary' => Color::Amber,
+            ])
+            ->navigationGroups([
+                NavigationGroup::make('メッセージ管理'),
+                NavigationGroup::make('スタンプ管理'),
+                NavigationGroup::make('クーポン管理'),
+                NavigationGroup::make('顧客管理'),
+                NavigationGroup::make('店舗管理'),
+                NavigationGroup::make('分析'),
+                NavigationGroup::make('システム設定')
+                    ->collapsed(),
             ])
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')

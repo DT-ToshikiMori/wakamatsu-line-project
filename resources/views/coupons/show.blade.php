@@ -27,7 +27,7 @@
     }
     .img{
       width:100%;
-      aspect-ratio: 3 / 1; /* 900x300 */
+      aspect-ratio: 1 / 1; /* 900x900 */
       background:#111;
       display:block;
       object-fit:cover;
@@ -88,7 +88,7 @@
   <div class="stage">
     <div id="rotateWrap" class="rotateWrap">
       <div class="card">
-        <img class="img" src="{{ \App\Models\CouponTemplate::resolveImageUrl($coupon->image_url) ?? 'https://placehold.co/900x300/png?text=COUPON' }}" alt="coupon">
+        <img class="img" src="{{ \App\Models\CouponTemplate::resolveImageUrl($coupon->image_url) ?? 'https://placehold.co/900x900/png?text=COUPON' }}" alt="coupon">
         <div class="body">
           <div class="row">
             <div class="title">{{ $coupon->title }}</div>

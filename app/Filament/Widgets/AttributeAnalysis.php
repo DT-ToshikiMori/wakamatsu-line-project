@@ -107,7 +107,7 @@ class AttributeAnalysis extends Widget
                 SUM(CASE WHEN last_visit_at >= ? AND last_visit_at < ? THEN 1 ELSE 0 END) as d_8_30,
                 SUM(CASE WHEN last_visit_at >= ? AND last_visit_at < ? THEN 1 ELSE 0 END) as d_31_90,
                 SUM(CASE WHEN last_visit_at >= ? AND last_visit_at < ? THEN 1 ELSE 0 END) as d_91_180,
-                SUM(CASE WHEN last_visit_at < ? OR last_visit_at IS NULL THEN 1 ELSE 0 END) as d_180plus
+                SUM(CASE WHEN last_visit_at < ? THEN 1 ELSE 0 END) as d_180plus
             ", [
                 $now->copy()->startOfDay(),
                 $now->copy()->subDays(7)->startOfDay(), $now->copy()->startOfDay(),

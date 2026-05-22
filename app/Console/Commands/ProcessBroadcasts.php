@@ -54,44 +54,51 @@ class ProcessBroadcasts extends Command
             return;
         }
 
-        // 対象ユーザー抽出（全ユーザー対象）
-        $query = DB::table('users')
-            ->whereNotNull('line_user_id');
+        // 対象ユーザー抽出
+        $query = DB::table('users')->whereNotNull('line_user_id');
 
-        if ($broadcast->filter_type === 'filtered') {
-            // ランク絞り込み
-            if (!empty($broadcast->filter_rank_card_id)) {
-                $query->where('current_card_id', $broadcast->filter_rank_card_id);
-            }
+        // 複数店舗フィルター（store_ids JSON配列）
+        $storeIds = $broadcast->store_ids ? json_decode($broadcast->store_ids, true) : null;
+        if (!empty($storeIds)) {
+            $query->whereExists(function ($q) use ($storeIds) {
+                $q->from('visits')
+                    ->whereColumn('visits.user_id', 'users.id')
+                    ->whereIn('visits.store_id', $storeIds);
+            });
+        }
 
-            // 最終来店からX日以上
-            if (!empty($broadcast->filter_days_since_visit)) {
-                $cutoff = now()->subDays($broadcast->filter_days_since_visit);
-                $query->where(function ($q) use ($cutoff) {
-                    $q->where('last_visit_at', '<=', $cutoff)
-                      ->orWhereNull('last_visit_at');
-                });
-            }
+        // ランク（複数選択対応）
+        $rankIds = $broadcast->filter_rank_card_id ? json_decode($broadcast->filter_rank_card_id, true) : null;
+        if (!empty($rankIds)) {
+            $query->whereIn('current_card_id', $rankIds);
+        }
 
-            // 来店回数X回以上
-            if (!empty($broadcast->filter_min_visits)) {
-                $query->where('visit_count', '>=', $broadcast->filter_min_visits);
-            }
+        // 性別（複数選択対応）
+        $genders = $broadcast->filter_gender ? json_decode($broadcast->filter_gender, true) : null;
+        if (!empty($genders)) {
+            $query->whereIn('gender', $genders);
+        }
 
-            // 性別
-            if (!empty($broadcast->filter_gender)) {
-                $query->where('gender', $broadcast->filter_gender);
-            }
+        // 誕生月（複数選択対応）
+        $birthMonths = $broadcast->filter_birth_month ? json_decode($broadcast->filter_birth_month, true) : null;
+        if (!empty($birthMonths)) {
+            $query->whereIn('birth_month', array_map('intval', $birthMonths));
+        }
 
-            // 誕生月
-            if (!empty($broadcast->filter_birth_month)) {
-                $query->where('birth_month', $broadcast->filter_birth_month);
-            }
+        // 来店回数
+        if (!empty($broadcast->filter_min_visits)) {
+            $query->where('visit_count', '>=', $broadcast->filter_min_visits);
+        }
+        if (!empty($broadcast->filter_max_visits)) {
+            $query->where('visit_count', '<=', $broadcast->filter_max_visits);
+        }
 
-            // 来店回数X回以下
-            if (!empty($broadcast->filter_max_visits)) {
-                $query->where('visit_count', '<=', $broadcast->filter_max_visits);
-            }
+        // 最終来店からX日以上（ダッシュボードと同一基準: first_visit_at IS NOT NULL + startOfDay）
+        if (!empty($broadcast->filter_days_since_visit)) {
+            $cutoff = now()->subDays($broadcast->filter_days_since_visit)->startOfDay();
+            $query->whereNotNull('first_visit_at')
+                  ->whereNotNull('last_visit_at')
+                  ->where('last_visit_at', '<', $cutoff);
         }
 
         $users = $query->get();

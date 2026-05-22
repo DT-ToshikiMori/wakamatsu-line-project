@@ -15,6 +15,7 @@ class MessageCampaignResource extends Resource
     protected static ?string $model = MessageCampaign::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-envelope';
+    protected static bool    $shouldRegisterNavigation = false; // 自由配信・来店シナリオに統合済み
 
     protected static ?string $navigationGroup = 'メッセージ管理';
     protected static ?string $navigationLabel = '統合メッセージ';

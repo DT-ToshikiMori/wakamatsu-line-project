@@ -21,8 +21,9 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Relation::morphMap([
-            'broadcast' => \App\Models\Broadcast::class,
+            'broadcast'      => \App\Models\Broadcast::class,
             'churn_scenario' => \App\Models\ChurnScenario::class,
+            'visit_scenario' => \App\Models\VisitScenario::class,
         ]);
 
         // DB の LINE 設定を config に上書き（設定されている場合のみ）
@@ -39,6 +40,12 @@ class AppServiceProvider extends ServiceProvider
                 if ($val) {
                     config([$configKey => $val]);
                 }
+            }
+
+            // LIFF URL を liff_id から自動生成して config に設定
+            $liffId = config('services.line.liff_id');
+            if ($liffId) {
+                config(['services.line.liff_url' => 'https://liff.line.me/' . $liffId]);
             }
         } catch (\Throwable $e) {
             // DBが未準備の場合は無視

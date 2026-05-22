@@ -31,17 +31,6 @@ class CouponTemplateResource extends Resource
                 ->nullable()
                 ->helperText('未選択の場合、グローバルクーポン'),
 
-            Forms\Components\Select::make('type')
-                ->label('種別')
-                ->options([
-                    'birthday' => '誕生日',
-                    'inactive' => '離脱防止',
-                    // 'rank_up' => 'ランクアップ',  // 来店シナリオに移行
-                    // 'stamp'  => 'スタンプ到達',   // 来店シナリオに移行
-                ])
-                ->required()
-                ->live(),
-
             Forms\Components\Select::make('mode')
                 ->label('モード')
                 ->options([
@@ -62,49 +51,32 @@ class CouponTemplateResource extends Resource
                 ->rows(3),
 
             Forms\Components\FileUpload::make('image_url')
-                ->label('ヘッダー画像（横長 3:1）')
+                ->label('クーポン画像（正方形 1:1）')
                 ->disk('public')
                 ->directory('coupon-images')
                 ->image()
                 ->imageResizeMode('cover')
-                ->imageCropAspectRatio('3:1')
+                ->imageCropAspectRatio('1:1')
                 ->imageResizeTargetWidth(900)
-                ->imageResizeTargetHeight(300)
+                ->imageResizeTargetHeight(900)
+                ->panelAspectRatio('1:1')
                 ->maxSize(2048)
-                ->helperText('推奨: 900×300px / 最大2MB'),
+                ->helperText('推奨: 900×900px / 最大2MB'),
 
-            // 誕生日
-            Forms\Components\TextInput::make('birthday_offset_days')
-                ->label('誕生日オフセット（日）')
-                ->numeric()
-                ->visible(fn ($get) => $get('type') === 'birthday'),
-
-            // 離脱防止
-            Forms\Components\TextInput::make('inactive_days')
-                ->label('最終来店からX日')
-                ->numeric()
-                ->visible(fn ($get) => $get('type') === 'inactive'),
-
-            Forms\Components\TextInput::make('inactive_hour')
-                ->label('配信時刻（時）')
-                ->numeric()
-                ->minValue(0)->maxValue(23)
-                ->visible(fn ($get) => $get('type') === 'inactive'),
-
-            Forms\Components\TextInput::make('inactive_minute')
-                ->label('配信時刻（分）')
-                ->numeric()
-                ->minValue(0)->maxValue(59)
-                ->visible(fn ($get) => $get('type') === 'inactive'),
-
-            // スタンプ到達・ランクアップは来店シナリオに移行したため非表示
-            // Forms\Components\TextInput::make('required_stamps') ...
-            // Forms\Components\Select::make('rank_card_id') ...
-
-            Forms\Components\TextInput::make('reminder_hours_before_expiry')
-                ->label('期限前リマインド（時間前）空欄=なし')
-                ->numeric()
-                ->nullable(),
+            // 誕生日配信設定（オプション）
+            Forms\Components\Section::make('誕生日配信設定')
+                ->description('設定するとユーザーの誕生日に合わせて自動配信されます。')
+                ->collapsed()
+                ->collapsible()
+                ->schema([
+                    Forms\Components\TextInput::make('birthday_offset_days')
+                        ->label('誕生日の何日前に配信')
+                        ->numeric()
+                        ->minValue(0)
+                        ->suffix('日前')
+                        ->nullable()
+                        ->helperText('0 = 誕生日当日'),
+                ]),
 
             Forms\Components\Toggle::make('is_active')
                 ->label('有効')
@@ -165,9 +137,9 @@ class CouponTemplateResource extends Resource
                     ->label('画像')
                     ->disk('public')
                     ->width(72)
-                    ->height(24),
+                    ->height(40)
+                    ->width(40),
                 Tables\Columns\TextColumn::make('store.name')->label('店舗')->sortable()->searchable(),
-                Tables\Columns\TextColumn::make('type')->label('種別')->sortable(),
                 Tables\Columns\TextColumn::make('mode')->label('モード')
                     ->formatStateUsing(fn (string $state) => $state === 'lottery' ? '抽選' : '通常')
                     ->sortable(),

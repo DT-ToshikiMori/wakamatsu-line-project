@@ -18,7 +18,7 @@
       overflow:hidden;
       box-shadow:0 16px 40px rgba(0,0,0,.35);
     }
-    .img{width:100%;aspect-ratio:3/1;background:#111;display:block;object-fit:cover}
+    .img{width:100%;aspect-ratio:1/1;background:#111;display:block;object-fit:cover}
     .body{padding:14px 16px}
     .title{font-weight:900;font-size:18px;letter-spacing:.03em}
     .note{opacity:.8;font-size:13px;margin-top:8px;line-height:1.5}
@@ -65,7 +65,7 @@
   <h1 class="h1">クーポン取得</h1>
 
   <div class="card">
-    <img class="img" src="{{ \App\Models\CouponTemplate::resolveImageUrl($tpl->image_url) ?? 'https://placehold.co/900x300/png?text=COUPON' }}" alt="coupon">
+    <img class="img" src="{{ \App\Models\CouponTemplate::resolveImageUrl($tpl->image_url) ?? 'https://placehold.co/900x900/png?text=COUPON' }}" alt="coupon">
     <div class="body">
       <div class="title">{{ $tpl->title }}</div>
       @if($tpl->note)

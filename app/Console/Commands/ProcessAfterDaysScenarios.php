@@ -31,12 +31,21 @@ class ProcessAfterDaysScenarios extends Command
     {
         $targetDate = now()->subDays((int) $scenario->trigger_days)->toDateString();
 
-        $users = DB::table('users')
+        $query = DB::table('users')
             ->where('current_card_id', $scenario->stamp_card_definition_id)
             ->whereNotNull('line_user_id')
             ->whereNotNull('last_visit_at')
-            ->whereDate('last_visit_at', $targetDate)
-            ->get();
+            ->whereDate('last_visit_at', $targetDate);
+
+        // 来店回数フィルター
+        if (!is_null($scenario->visit_count_min)) {
+            $query->where('visit_count', '>=', $scenario->visit_count_min);
+        }
+        if (!is_null($scenario->visit_count_max)) {
+            $query->where('visit_count', '<=', $scenario->visit_count_max);
+        }
+
+        $users = $query->get();
 
         foreach ($users as $user) {
             $repeat = (bool) ($scenario->repeat ?? false);

@@ -20,12 +20,12 @@
                 <template x-if="bubble.bubble_type === 'coupon'">
                     <div style="background: #ffffff; border-radius: 20px 4px 20px 20px; overflow: hidden; width: 220px; box-shadow: 0 1px 2px rgba(0,0,0,0.1);">
                         {{-- Hero Image --}}
-                        <div style="height: 72px; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+                        <div style="overflow: hidden;">
                             <template x-if="bubble.coupon_template_image_url">
-                                <img :src="bubble.coupon_template_image_url" style="width: 100%; height: 72px; object-fit: cover;" />
+                                <img :src="bubble.coupon_template_image_url" style="width: 100%; aspect-ratio: 1/1; object-fit: cover; display: block;" />
                             </template>
                             <template x-if="!bubble.coupon_template_image_url">
-                                <div style="width: 100%; height: 100%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center;">
+                                <div style="width: 100%; aspect-ratio: 1/1; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); display: flex; align-items: center; justify-content: center;">
                                     <svg xmlns="http://www.w3.org/2000/svg" style="width: 28px; height: 28px; color: rgba(255,255,255,0.8);" viewBox="0 0 20 20" fill="currentColor">
                                         <path d="M2 6a2 2 0 012-2h12a2 2 0 012 2v2a2 2 0 100 4v2a2 2 0 01-2 2H4a2 2 0 01-2-2v-2a2 2 0 100-4V6z"/>
                                     </svg>

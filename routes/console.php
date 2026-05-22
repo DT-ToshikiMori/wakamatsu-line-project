@@ -10,9 +10,10 @@ Artisan::command('inspire', function () {
 
 // メッセージ配信スケジュール
 // Schedule::command('messages:process-churn')->everyMinute(); // 統合済み → visit-scenario:process-after-days へ
+// Schedule::command('messages:process-schedules')->everyMinute(); // 統合済み → visit-scenario:* へ
 Schedule::command('visit-scenario:process-after-days')->everyMinute();
+Schedule::command('visit-scenario:process-birthday')->hourly(); // バッチ内で毎月1日・指定時刻のみ動作
 Schedule::command('messages:process-broadcasts')->everyMinute();
-Schedule::command('messages:process-schedules')->everyMinute();
 
 // クーポン有効期限チェック（5分ごと）
 Schedule::command('coupons:expire')->everyFiveMinutes();

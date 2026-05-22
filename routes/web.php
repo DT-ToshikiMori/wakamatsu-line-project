@@ -19,6 +19,11 @@ Route::post('/api/liff/init', [LiffController::class, 'init']);
 // LINE Webhook（CSRF除外 → VerifyCsrfToken で除外設定が必要）
 Route::post('/webhook/line', [LineWebhookController::class, 'handle']);
 
+// リッチメニュー URIクリック計測リダイレクト
+Route::get('/rm/click/{areaId}', [\App\Http\Controllers\RichMenuClickController::class, 'redirect'])
+    ->name('richmenu.click')
+    ->whereNumber('areaId');
+
 // QRコード画像ダウンロード（Filament管理画面から呼ばれる）
 Route::get('/admin/qr-download/{storeQrLink}', function (\App\Models\StoreQrLink $storeQrLink) {
     $liffId = config('services.line.liff_id');

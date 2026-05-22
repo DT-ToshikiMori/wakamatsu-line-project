@@ -11,6 +11,7 @@ class RichMenu extends Model
         'line_rich_menu_id',
         'chat_bar_text',
         'size_type',
+        'template_key',
         'selected',
         'image_path',
         'is_default',
@@ -41,18 +42,22 @@ class RichMenu extends Model
 
         $areas = $this->areas->map(function (RichMenuArea $area) {
             $action = match ($area->action_type) {
-                'postback' => [
-                    'type' => 'postback',
-                    'data' => $area->action_data ?? "action=richmenu_click&area_id={$area->id}",
-                    'displayText' => $area->label,
-                ],
+                'postback' => array_filter([
+                    'type'        => 'postback',
+                    'data'        => $area->action_data ?? "action=richmenu_click&area_id={$area->id}",
+                    // displayText: postback時にトーク画面に表示するテキスト（任意）
+                    'displayText' => $area->label ?: null,
+                ], fn ($v) => $v !== null),
                 'uri' => [
-                    'type' => 'uri',
-                    'uri' => $area->action_data,
+                    'type'  => 'uri',
+                    'label' => mb_substr($area->label, 0, 20), // LINE仕様: 最大20文字
+                    // クリック計測のためリダイレクト経由。直接URLも有効なフォールバック
+                    'uri'   => url("/rm/click/{$area->id}"),
                 ],
                 'message' => [
                     'type' => 'message',
-                    'text' => $area->action_data ?? $area->label,
+                    'label' => mb_substr($area->label, 0, 20),
+                    'text'  => $area->action_data ?? $area->label,
                 ],
             };
 

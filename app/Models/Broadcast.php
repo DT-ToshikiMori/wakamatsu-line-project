@@ -8,6 +8,7 @@ class Broadcast extends Model
 {
     protected $fillable = [
         'store_id',
+        'store_ids',
         'name',
         'filter_type',
         'filter_rank_card_id',
@@ -24,7 +25,8 @@ class Broadcast extends Model
 
     protected $casts = [
         'scheduled_at' => 'datetime',
-        'sent_at' => 'datetime',
+        'sent_at'      => 'datetime',
+        'store_ids'    => 'array',
     ];
 
     public function store()

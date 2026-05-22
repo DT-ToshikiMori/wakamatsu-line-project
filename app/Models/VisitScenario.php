@@ -38,4 +38,22 @@ class VisitScenario extends Model
     {
         return $this->belongsTo(\App\Models\CouponTemplate::class);
     }
+
+    public function bubbles()
+    {
+        return $this->morphMany(MessageBubble::class, 'parent', 'parent_type', 'parent_id')
+            ->orderBy('position');
+    }
+
+    public function reminders()
+    {
+        return $this->hasMany(VisitScenarioReminder::class, 'visit_scenario_id')
+            ->orderBy('before_days');
+    }
+
+    /** バブルにクーポンが含まれているか */
+    public function hasCouponBubble(): bool
+    {
+        return $this->bubbles()->where('bubble_type', 'coupon')->exists();
+    }
 }

@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\RichMenuResource\Pages;
 use App\Models\RichMenu;
 use App\Services\RichMenuService;
+use App\Support\RichMenuTemplates;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Notifications\Notification;
@@ -27,101 +28,128 @@ class RichMenuResource extends Resource
     public static function form(Form $form): Form
     {
         return $form->schema([
-            Forms\Components\TextInput::make('name')
-                ->label('管理名')
-                ->required()
-                ->maxLength(255),
+            // ① 基本情報
+            Forms\Components\Section::make('基本設定')
+                ->icon('heroicon-o-pencil-square')
+                ->schema([
+                    Forms\Components\TextInput::make('name')
+                        ->label('管理名')
+                        ->required()
+                        ->maxLength(255)
+                        ->columnSpanFull(),
 
-            Forms\Components\TextInput::make('chat_bar_text')
-                ->label('チャットバーテキスト')
-                ->required()
-                ->maxLength(50)
-                ->helperText('チャット画面下部に表示されるテキスト（最大50文字）'),
+                    Forms\Components\TextInput::make('chat_bar_text')
+                        ->label('メニューバーテキスト')
+                        ->required()
+                        ->maxLength(50)
+                        ->default('メニュー')
+                        ->helperText('トーク画面下部でリッチメニューが閉じているときに表示されるバーのテキスト（例: メニュー・お得情報・クーポン）')
+                        ->columnSpanFull(),
 
-            Forms\Components\Select::make('size_type')
-                ->label('サイズ')
-                ->options([
-                    'full' => 'フル（2500×1686）',
-                    'half' => 'ハーフ（2500×843）',
-                ])
-                ->default('full')
-                ->required(),
+                    Forms\Components\Toggle::make('selected')
+                        ->label('デフォルト展開')
+                        ->helperText('ONにするとリッチメニューがデフォルトで展開された状態になります')
+                        ->columnSpanFull(),
+                ]),
 
-            Forms\Components\Toggle::make('selected')
-                ->label('デフォルト展開')
-                ->helperText('ONにするとリッチメニューがデフォルトで展開された状態になります'),
+            // ② テンプレート選択（画像カード）
+            Forms\Components\Section::make('テンプレート')
+                ->icon('heroicon-o-squares-2x2')
+                ->schema([
+                    // 画像ピッカー（Alpine.js + $wire.set）
+                    Forms\Components\View::make('filament.forms.components.rich-menu-template-picker'),
 
-            Forms\Components\FileUpload::make('image_path')
-                ->label('メニュー画像')
-                ->image()
-                ->disk('public')
-                ->directory('rich-menus')
-                ->helperText('フル: 2500×1686px / ハーフ: 2500×843px（PNG or JPEG）'),
+                    // テンプレートキー（Hidden相当、liveでエリア自動設定）
+                    Forms\Components\Hidden::make('template_key')
+                        ->live()
+                        ->afterStateUpdated(function (?string $state, Forms\Set $set) {
+                            if (!$state) return;
+                            $tpl = RichMenuTemplates::get($state);
+                            if (!$tpl) return;
+                            // size_type を自動設定
+                            $set('size_type', $tpl['size_type']);
+                            // エリアを自動生成
+                            $set('areas', RichMenuTemplates::buildAreaRows($state));
+                        }),
 
-            // エリア設定
+                    // size_type は自動設定（隠し）
+                    Forms\Components\Hidden::make('size_type')->default('full'),
+                ]),
+
+            // ③ メニュー画像アップロード
+            Forms\Components\Section::make('メニュー画像')
+                ->icon('heroicon-o-photo')
+                ->schema([
+                    Forms\Components\FileUpload::make('image_path')
+                        ->label('')
+                        ->image()
+                        ->disk('public')
+                        ->directory('rich-menus')
+                        ->helperText('フル: 2500×1686px / ハーフ: 2500×843px（PNG or JPEG）')
+                        ->columnSpanFull(),
+                ]),
+
+            // ④ タップエリア設定
             Forms\Components\Section::make('タップエリア設定')
-                ->description('リッチメニュー画像上のタップ領域を設定（最大20個）')
+                ->description('テンプレートを選択すると自動生成されます。ラベル・アクションを編集してください。')
+                ->icon('heroicon-o-cursor-arrow-rays')
                 ->schema([
                     Forms\Components\Repeater::make('areas')
-                        ->label('エリア')
+                        ->label('')
                         ->relationship()
                         ->schema([
-                            Forms\Components\TextInput::make('label')
-                                ->label('ラベル')
-                                ->required()
-                                ->maxLength(255),
-
-                            Forms\Components\Grid::make(4)
+                            Forms\Components\Grid::make(5)
                                 ->schema([
-                                    Forms\Components\TextInput::make('x')
-                                        ->label('X座標')
-                                        ->numeric()
+                                    Forms\Components\TextInput::make('label')
+                                        ->label('ラベル')
                                         ->required()
-                                        ->minValue(0),
-                                    Forms\Components\TextInput::make('y')
-                                        ->label('Y座標')
-                                        ->numeric()
+                                        ->maxLength(255)
+                                        ->columnSpan(2),
+
+                                    Forms\Components\Select::make('action_type')
+                                        ->label('アクション')
+                                        ->options([
+                                            'uri'      => 'URL（クリック計測あり）',
+                                            'postback' => 'Postback（カスタム）',
+                                            'message'  => 'メッセージ送信',
+                                        ])
+                                        ->default('uri')
                                         ->required()
-                                        ->minValue(0),
-                                    Forms\Components\TextInput::make('width')
-                                        ->label('幅')
-                                        ->numeric()
-                                        ->required()
-                                        ->minValue(1),
-                                    Forms\Components\TextInput::make('height')
-                                        ->label('高さ')
-                                        ->numeric()
-                                        ->required()
-                                        ->minValue(1),
+                                        ->live()
+                                        ->columnSpan(1),
+
+                                    Forms\Components\TextInput::make('action_data')
+                                        ->label(fn ($get) => match ($get('action_type')) {
+                                            'uri'     => 'URL',
+                                            'message' => 'テキスト',
+                                            default   => 'Postbackデータ（空=自動）',
+                                        })
+                                        ->required(fn ($get) => in_array($get('action_type'), ['uri', 'message']))
+                                        ->columnSpan(2),
                                 ]),
 
-                            Forms\Components\Select::make('action_type')
-                                ->label('アクション種別')
-                                ->options([
-                                    'postback' => 'Postback（クリック計測可能）',
-                                    'uri' => 'URI（外部リンク）',
-                                    'message' => 'メッセージ送信',
+                            // 座標（デフォルト非表示）
+                            Forms\Components\Section::make('座標（自動設定済み）')
+                                ->schema([
+                                    Forms\Components\Grid::make(4)
+                                        ->schema([
+                                            Forms\Components\TextInput::make('x')->label('X')->numeric()->required()->minValue(0),
+                                            Forms\Components\TextInput::make('y')->label('Y')->numeric()->required()->minValue(0),
+                                            Forms\Components\TextInput::make('width')->label('幅')->numeric()->required()->minValue(1),
+                                            Forms\Components\TextInput::make('height')->label('高さ')->numeric()->required()->minValue(1),
+                                        ]),
                                 ])
-                                ->default('postback')
-                                ->required()
-                                ->live(),
-
-                            Forms\Components\TextInput::make('action_data')
-                                ->label(fn ($get) => match ($get('action_type')) {
-                                    'uri' => 'URL',
-                                    'message' => 'メッセージテキスト',
-                                    default => 'Postbackデータ（空欄で自動生成）',
-                                })
-                                ->helperText(fn ($get) => $get('action_type') === 'postback'
-                                    ? '空欄の場合 action=richmenu_click&area_id={id} が自動設定されます'
-                                    : null)
-                                ->required(fn ($get) => in_array($get('action_type'), ['uri', 'message'])),
+                                ->collapsed()
+                                ->collapsible()
+                                ->compact(),
                         ])
                         ->orderColumn('position')
                         ->maxItems(20)
                         ->defaultItems(0)
-                        ->addActionLabel('エリアを追加')
-                        ->reorderable(true),
+                        ->addActionLabel('エリアを手動追加')
+                        ->reorderable(true)
+                        ->collapsible()
+                        ->itemLabel(fn (array $state) => $state['label'] ?? 'エリア'),
                 ]),
         ]);
     }
