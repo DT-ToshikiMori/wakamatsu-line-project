@@ -58,8 +58,11 @@ class RichMenu extends Model
                 'uri' => [
                     'type'  => 'uri',
                     'label' => mb_substr($area->label, 0, 20), // LINE仕様: 最大20文字
-                    // クリック計測のためリダイレクト経由。直接URLも有効なフォールバック
-                    'uri'   => url("/rm/click/{$area->id}"),
+                    // LIFF URLはリダイレクトを挟むと、LINE内ブラウザ→ミニアプリの二重起動になりやすい。
+                    // そのためLIFFは直リンク、それ以外はクリック計測リダイレクト経由にする。
+                    'uri'   => $this->shouldBypassClickRedirect($area->action_data)
+                        ? $area->action_data
+                        : url("/rm/click/{$area->id}"),
                 ],
                 'message' => [
                     'type' => 'message',
@@ -89,5 +92,19 @@ class RichMenu extends Model
             'chatBarText' => $this->chat_bar_text,
             'areas' => $areas,
         ];
+    }
+
+    private function shouldBypassClickRedirect(?string $uri): bool
+    {
+        if (!$uri) {
+            return false;
+        }
+
+        $liffId = (string) config('services.line.liff_id', '');
+        if ($liffId !== '' && str_starts_with($uri, "https://liff.line.me/{$liffId}")) {
+            return true;
+        }
+
+        return str_starts_with($uri, 'line://app/');
     }
 }
