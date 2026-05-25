@@ -163,8 +163,11 @@
     <div class="formTitle">ユーザー登録</div>
     <div class="formDesc">スタンプカードをご利用いただくため、以下の情報をご入力ください。</div>
 
-    <form method="POST" action="/s/{{ $store->id }}/register" id="registerForm">
+    <form method="POST" action="/register" id="registerForm">
       @csrf
+      @if(!empty($qrLinkId))
+        <input type="hidden" name="qr_link_id" value="{{ (int)$qrLinkId }}">
+      @endif
 
       <div class="field">
         <label>当店へのご来店回数<span class="required">必須</span></label>

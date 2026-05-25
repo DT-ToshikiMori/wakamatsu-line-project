@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Log;
 class StampCardController extends Controller
 {
 
-    public function card(Request $req, int $store)
+    public function card(Request $req, ?int $store = null)
     {
         $lineUserId = $req->attributes->get('line_user_id');
 
@@ -24,14 +24,14 @@ class StampCardController extends Controller
         $displayName = $req->attributes->get('line_display_name');
         $picture = $req->attributes->get('line_picture');
 
-        $storeRow = DB::table('stores')->where('id', $store)->first();
-        abort_if(!$storeRow, 404, 'store not found');
-
         // users upsert（line_user_id でグローバル一意）
         $user = DB::table('users')->where('line_user_id', $lineUserId)->first();
+        $storeRow = $this->resolveStore($req, $store, $user);
+        $storeId = (int) $storeRow->id;
+
         if (!$user) {
             $userId = DB::table('users')->insertGetId([
-                'store_id' => $store,
+                'store_id' => $storeId,
                 'line_user_id' => $lineUserId,
                 'display_name' => $displayName,
                 'profile_image_url' => $picture,
@@ -64,8 +64,7 @@ class StampCardController extends Controller
 
         // 未登録項目あり → 登録フォームへリダイレクト（qr_link_id を引き継ぐ）
         if ($user->gender === null || $user->visit_frequency === null) {
-            $qrParam = $req->integer('qr_link_id') ? '?qr_link_id=' . $req->integer('qr_link_id') : '';
-            return redirect("/s/{$store}/register{$qrParam}");
+            return redirect($this->registerUrl($req->integer('qr_link_id') ?: null));
         }
 
         // QRスキャン自動チェックイン
@@ -79,11 +78,11 @@ class StampCardController extends Controller
                 ->exists();
 
             if (!$recentVisit) {
-                $this->performCheckin($store, $user, $lineUserId, $qrLinkId);
+                $this->performCheckin($storeId, $user, $lineUserId, $qrLinkId);
             }
 
             // stamped=1 を付けてリダイレクト（重複実行防止）
-            return redirect("/s/{$store}/card?ok=1&stamped=1");
+            return redirect('/card?ok=1&stamped=1');
         }
 
         // ① ランク定義（グローバル、priority順）
@@ -156,40 +155,42 @@ class StampCardController extends Controller
             'currentCard' => $currentCard,
             'nextCard' => $nextCard,
             'isBeginner' => $isBeginner,
+            'qrLinkId' => $req->integer('qr_link_id') ?: null,
         ]);
     }
 
-    public function registerForm(Request $req, int $store)
+    public function registerForm(Request $req, ?int $store = null)
     {
         $lineUserId = $req->attributes->get('line_user_id');
         if (!$lineUserId) {
             return response()->view('liff-auth');
         }
 
-        $storeRow = DB::table('stores')->where('id', $store)->first();
-        abort_if(!$storeRow, 404, 'store not found');
-
         $user = DB::table('users')->where('line_user_id', $lineUserId)->first();
         abort_if(!$user, 404, 'user not found');
 
+        $storeRow = $this->resolveStore($req, $store, $user);
+
         // 既に登録済みならカードページへ
         if ($user->gender !== null && $user->visit_frequency !== null) {
-            return redirect("/s/{$store}/card");
+            return redirect('/card');
         }
 
         return view('stamp.register', [
             'store' => $storeRow,
             'user' => $user,
+            'qrLinkId' => $req->integer('qr_link_id') ?: null,
         ]);
     }
 
-    public function registerSave(Request $req, int $store)
+    public function registerSave(Request $req, ?int $store = null)
     {
         $lineUserId = $req->attributes->get('line_user_id');
         abort_if(!$lineUserId, 401, 'LIFF認証が必要です');
 
         $user = DB::table('users')->where('line_user_id', $lineUserId)->first();
         abort_if(!$user, 404, 'user not found');
+        $this->resolveStore($req, $store, $user);
 
         $validated = $req->validate([
             'visit_frequency' => 'required|in:new,2_3,4plus',
@@ -206,10 +207,10 @@ class StampCardController extends Controller
             'updated_at' => now(),
         ]);
 
-        return redirect("/s/{$store}/card");
+        return redirect($this->cardUrl($req->integer('qr_link_id') ?: null));
     }
 
-    public function checkin(Request $req, int $store)
+    public function checkin(Request $req, ?int $store = null)
     {
         $lineUserId = $req->attributes->get('line_user_id');
         abort_if(!$lineUserId, 401, 'LIFF認証が必要です');
@@ -219,8 +220,10 @@ class StampCardController extends Controller
             ->first();
         abort_if(!$user, 404, 'user not found');
 
+        $storeRow = $this->resolveStore($req, $store, $user);
+        $storeId = (int) $storeRow->id;
         $qrLinkId = $req->input('qr_link_id');
-        $result = $this->performCheckin($store, $user, $lineUserId, $qrLinkId ? (int)$qrLinkId : null);
+        $result = $this->performCheckin($storeId, $user, $lineUserId, $qrLinkId ? (int)$qrLinkId : null);
 
         if ($req->expectsJson()) {
             $response = [
@@ -240,7 +243,7 @@ class StampCardController extends Controller
             return response()->json($response);
         }
 
-        return redirect("/s/{$store}/card");
+        return redirect('/card');
     }
 
     /**
@@ -593,7 +596,7 @@ class StampCardController extends Controller
         ];
     }
 
-    public function clear(Request $req, int $store)
+    public function clear(Request $req, ?int $store = null)
     {
         $lineUserId = $req->attributes->get('line_user_id');
         abort_if(!$lineUserId, 401, 'LIFF認証が必要です');
@@ -603,9 +606,12 @@ class StampCardController extends Controller
             ->first();
         abort_if(!$user, 404, 'user not found');
 
-        DB::transaction(function () use ($store, $user) {
+        $storeRow = $this->resolveStore($req, $store, $user);
+        $storeId = (int) $storeRow->id;
+
+        DB::transaction(function () use ($storeId, $user) {
             DB::table('visits')
-                ->where('store_id', $store)
+                ->where('store_id', $storeId)
                 ->where('user_id', $user->id)
                 ->delete();
 
@@ -634,6 +640,38 @@ class StampCardController extends Controller
             ]);
         }
 
-        return redirect("/s/{$store}/card");
+        return redirect('/card');
+    }
+
+    private function resolveStore(Request $req, ?int $routeStore = null, ?object $user = null): object
+    {
+        $qrLinkId = $req->integer('qr_link_id') ?: null;
+
+        if ($qrLinkId) {
+            $qrLink = DB::table('store_qr_links')->where('id', $qrLinkId)->first();
+            abort_if(!$qrLink, 404, 'QR link not found');
+            $storeId = (int) $qrLink->store_id;
+        } elseif ($routeStore) {
+            $storeId = $routeStore;
+        } elseif ($user && $user->store_id) {
+            $storeId = (int) $user->store_id;
+        } else {
+            $storeId = 1;
+        }
+
+        $store = DB::table('stores')->where('id', $storeId)->first();
+        abort_if(!$store, 404, 'store not found');
+
+        return $store;
+    }
+
+    private function cardUrl(?int $qrLinkId = null): string
+    {
+        return $qrLinkId ? '/card?' . http_build_query(['qr_link_id' => $qrLinkId]) : '/card';
+    }
+
+    private function registerUrl(?int $qrLinkId = null): string
+    {
+        return $qrLinkId ? '/register?' . http_build_query(['qr_link_id' => $qrLinkId]) : '/register';
     }
 }

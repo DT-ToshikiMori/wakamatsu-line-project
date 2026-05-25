@@ -29,7 +29,7 @@ Route::get('/admin/qr-download/{storeQrLink}', function (\App\Models\StoreQrLink
     $liffId = config('services.line.liff_id');
     abort_if(!$liffId, 500, 'LIFF_ID is not configured');
 
-    $url = "https://liff.line.me/{$liffId}/s/{$storeQrLink->store_id}/card?qr_link_id={$storeQrLink->id}";
+    $url = "https://liff.line.me/{$liffId}/card?qr_link_id={$storeQrLink->id}";
 
     $options = new \chillerlan\QRCode\QROptions([
         'outputType' => \chillerlan\QRCode\Output\QROutputInterface::GDIMAGE_PNG,
@@ -74,16 +74,12 @@ Route::get('/r/{slug}', function (Request $req, string $slug) {
 
     abort_if(!$link, 404, 'QR link not found');
 
-    $storeId = $link->store_id ?? $req->integer('store_id');
-    abort_if(!$storeId, 400, 'store_id is required');
-
     $liffId = config('services.line.liff_id');
 
     if ($liffId) {
         // LIFF URLへリダイレクト（LINEアプリ内で開く）
         // QRリンクIDも渡して stamp_count を参照できるようにする
-        $path = urlencode("/s/{$storeId}/card?qr_link_id={$link->id}");
-        return redirect("https://liff.line.me/{$liffId}?path={$path}");
+        return redirect("https://liff.line.me/{$liffId}/card?qr_link_id={$link->id}");
     }
 
     // LIFF未設定時はリダイレクトURLへフォールバック
@@ -94,6 +90,12 @@ Route::get('/r/{slug}', function (Request $req, string $slug) {
 
 // LIFF認証が必要なルート
 Route::middleware('liff')->group(function () {
+    Route::get('/card', [StampCardController::class, 'card']);
+    Route::get('/register', [StampCardController::class, 'registerForm']);
+    Route::post('/register', [StampCardController::class, 'registerSave']);
+    Route::post('/checkin', [StampCardController::class, 'checkin']);
+    Route::post('/clear', [StampCardController::class, 'clear']);
+
     Route::get('/s/{store}/card', [StampCardController::class, 'card']);
     Route::get('/s/{store}/register', [StampCardController::class, 'registerForm']);
     Route::post('/s/{store}/register', [StampCardController::class, 'registerSave']);

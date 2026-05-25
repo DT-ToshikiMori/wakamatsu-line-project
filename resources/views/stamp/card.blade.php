@@ -410,6 +410,7 @@
 @include('partials.liff-init')
 <script>
   const storeId = {{ (int)$store->id }};
+  const qrLinkId = @json($qrLinkId ?? null);
   const goal = {{ (int)$goal }};
   const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 
@@ -467,9 +468,11 @@
     btn.disabled = true;
 
     try {
-      const res = await fetch(`/s/${storeId}/checkin`, {
+      const payload = qrLinkId ? { qr_link_id: qrLinkId } : {};
+      const res = await fetch('/checkin', {
         method: 'POST',
         headers: liffHeaders(),
+        body: JSON.stringify(payload),
       });
 
       const data = await res.json();
@@ -551,7 +554,7 @@
       if (!confirm('スタンプと来店回数をすべてリセットします。よろしいですか？')) return;
       clearBtn.disabled = true;
       try {
-        const res = await fetch(`/s/${storeId}/clear`, {
+        const res = await fetch('/clear', {
           method: 'POST',
           headers: liffHeaders(),
         });
