@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class RichMenu extends Model
 {
@@ -12,6 +13,7 @@ class RichMenu extends Model
         'chat_bar_text',
         'size_type',
         'template_key',
+        'target_stamp_card_definition_id',
         'selected',
         'image_path',
         'is_default',
@@ -33,6 +35,11 @@ class RichMenu extends Model
     public function clicks()
     {
         return $this->hasManyThrough(RichMenuClick::class, RichMenuArea::class);
+    }
+
+    public function targetStampCardDefinition(): BelongsTo
+    {
+        return $this->belongsTo(StampCardDefinition::class, 'target_stamp_card_definition_id');
     }
 
     public function toLineApiPayload(): array

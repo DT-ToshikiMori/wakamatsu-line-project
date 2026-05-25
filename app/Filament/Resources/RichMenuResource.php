@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\RichMenuResource\Pages;
 use App\Models\RichMenu;
+use App\Models\StampCardDefinition;
 use App\Services\RichMenuService;
 use App\Support\RichMenuTemplates;
 use Filament\Forms;
@@ -49,6 +50,24 @@ class RichMenuResource extends Resource
                     Forms\Components\Toggle::make('selected')
                         ->label('デフォルト展開')
                         ->helperText('ONにするとリッチメニューがデフォルトで展開された状態になります')
+                        ->columnSpanFull(),
+
+                    Forms\Components\Radio::make('target_stamp_card_definition_id')
+                        ->label('表示対象ランク')
+                        ->options(fn (): array => ['' => '共通（全ユーザー）'] + StampCardDefinition::query()
+                            ->where('is_active', true)
+                            ->orderBy('priority')
+                            ->get()
+                            ->mapWithKeys(fn (StampCardDefinition $card): array => [
+                                $card->id => $card->display_name === $card->name
+                                    ? $card->display_name
+                                    : "{$card->display_name}（{$card->name}）",
+                            ])
+                            ->all())
+                        ->default('')
+                        ->afterStateHydrated(fn (Forms\Components\Radio $component, $state) => $component->state($state ?? ''))
+                        ->dehydrateStateUsing(fn ($state) => blank($state) ? null : $state)
+                        ->helperText('未選択の場合は共通メニューとして扱います。LINEユーザーへの出し分け連携は別途実装します。')
                         ->columnSpanFull(),
                 ]),
 
@@ -181,6 +200,13 @@ class RichMenuResource extends Resource
                 Tables\Columns\IconColumn::make('is_default')
                     ->label('デフォルト')
                     ->boolean(),
+
+                Tables\Columns\TextColumn::make('targetStampCardDefinition.display_name')
+                    ->label('表示対象')
+                    ->formatStateUsing(fn (?string $state) => $state ?: '共通')
+                    ->placeholder('共通')
+                    ->badge()
+                    ->color(fn (RichMenu $record) => $record->target_stamp_card_definition_id ? 'info' : 'gray'),
 
                 Tables\Columns\TextColumn::make('areas_count')
                     ->label('エリア数')
