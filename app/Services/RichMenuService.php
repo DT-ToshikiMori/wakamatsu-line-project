@@ -226,13 +226,15 @@ class RichMenuService
 
     /**
      * リッチメニューをLINEに同期（作成 → 画像アップロード → ステータス更新）
+     *
+     * LINEのリッチメニューは更新APIが無いため、同期時は新規作成する。
+     * ただし既存のLINEリッチメニューを先に削除すると、表示中/個別リンク中の
+     * メニューが消えてしまうため、自動削除はしない。
      */
     public function syncToLine(RichMenu $richMenu): bool
     {
-        // 既存のLINEリッチメニューがあれば削除
-        if ($richMenu->line_rich_menu_id) {
-            $this->deleteFromLine($richMenu->line_rich_menu_id);
-        }
+        $oldLineRichMenuId = $richMenu->line_rich_menu_id;
+        $wasDefault = (bool) $richMenu->is_default || $richMenu->status === 'active';
 
         // 1. リッチメニュー作成
         $lineId = $this->createOnLine($richMenu);
@@ -248,12 +250,26 @@ class RichMenuService
             }
         }
 
-        // 3. ステータス更新
+        // 3. デフォルトだったメニューは新しいLINE IDをデフォルトに付け替える
+        if ($wasDefault && !$this->setDefault($lineId)) {
+            $this->deleteFromLine($lineId);
+            return false;
+        }
+
+        // 4. ステータス更新
         $richMenu->update([
             'line_rich_menu_id' => $lineId,
-            'status' => 'synced',
+            'status' => $wasDefault ? 'active' : 'synced',
             'synced_at' => now(),
         ]);
+
+        if ($oldLineRichMenuId) {
+            Log::info('RichMenuService: old LINE rich menu retained after sync', [
+                'rich_menu_id' => $richMenu->id,
+                'old_line_rich_menu_id' => $oldLineRichMenuId,
+                'new_line_rich_menu_id' => $lineId,
+            ]);
+        }
 
         return true;
     }
