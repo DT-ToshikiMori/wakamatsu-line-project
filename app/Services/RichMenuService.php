@@ -48,20 +48,95 @@ class RichMenuService
             return false;
         }
 
-        $response = Http::withToken($this->accessToken)
-            ->withHeaders(['Content-Type' => 'image/png'])
-            ->withBody(file_get_contents($fullPath), 'image/png')
-            ->post("https://api-data.line.me/v2/bot/richmenu/{$lineRichMenuId}/content");
+        $prepared = $this->prepareImageForLineUpload($fullPath);
+        if (!$prepared) {
+            return false;
+        }
+
+        [$uploadPath, $contentType, $temporary] = $prepared;
+
+        try {
+            $response = Http::withToken($this->accessToken)
+                ->withHeaders(['Content-Type' => $contentType])
+                ->withBody(file_get_contents($uploadPath), $contentType)
+                ->post("https://api-data.line.me/v2/bot/richmenu/{$lineRichMenuId}/content");
+        } finally {
+            if ($temporary && file_exists($uploadPath)) {
+                @unlink($uploadPath);
+            }
+        }
 
         if (!$response->successful()) {
             Log::warning('RichMenuService: uploadImage failed', [
                 'status' => $response->status(),
                 'body' => $response->body(),
+                'bytes' => file_exists($fullPath) ? filesize($fullPath) : null,
+                'content_type' => $contentType,
             ]);
             return false;
         }
 
         return true;
+    }
+
+    /**
+     * LINEリッチメニュー画像は1MB以下が必要。
+     * 1MBを超えるPNG/JPEGは、寸法を維持したままJPEGへ圧縮してアップロードする。
+     *
+     * @return array{0:string,1:string,2:bool}|null [path, content-type, is-temporary]
+     */
+    private function prepareImageForLineUpload(string $fullPath): ?array
+    {
+        $maxBytes = 1024 * 1024;
+        $imageInfo = @getimagesize($fullPath);
+        $mime = $imageInfo['mime'] ?? 'image/png';
+
+        if (filesize($fullPath) <= $maxBytes) {
+            return [$fullPath, in_array($mime, ['image/png', 'image/jpeg'], true) ? $mime : 'image/png', false];
+        }
+
+        if (!function_exists('imagecreatefromstring') || !function_exists('imagejpeg')) {
+            Log::warning('RichMenuService: image too large and GD jpeg encoder unavailable', [
+                'path' => $fullPath,
+                'bytes' => filesize($fullPath),
+            ]);
+            return null;
+        }
+
+        $source = @imagecreatefromstring(file_get_contents($fullPath));
+        if (!$source) {
+            Log::warning('RichMenuService: failed to decode image for compression', [
+                'path' => $fullPath,
+                'bytes' => filesize($fullPath),
+            ]);
+            return null;
+        }
+
+        $tmpPath = tempnam(sys_get_temp_dir(), 'line-rich-menu-');
+        if (!$tmpPath) {
+            imagedestroy($source);
+            return null;
+        }
+
+        foreach ([90, 85, 80, 75, 70, 65, 60] as $quality) {
+            imagejpeg($source, $tmpPath, $quality);
+            clearstatcache(true, $tmpPath);
+
+            if (filesize($tmpPath) <= $maxBytes) {
+                imagedestroy($source);
+                return [$tmpPath, 'image/jpeg', true];
+            }
+        }
+
+        imagedestroy($source);
+        @unlink($tmpPath);
+
+        Log::warning('RichMenuService: image remains too large after compression', [
+            'path' => $fullPath,
+            'bytes' => filesize($fullPath),
+        ]);
+
+        return null;
     }
 
     /**
