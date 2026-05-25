@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\RichMenu;
+use App\Models\User;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -13,7 +14,7 @@ class RichMenuService
 
     public function __construct()
     {
-        $this->accessToken = config('services.line.bot_channel_access_token', '');
+        $this->accessToken = (string) config('services.line.bot_channel_access_token', '');
     }
 
     /**
@@ -99,6 +100,109 @@ class RichMenuService
         }
 
         return true;
+    }
+
+    /**
+     * ユーザー個別のリッチメニューを紐付ける
+     */
+    public function linkToUser(string $lineUserId, string $lineRichMenuId): bool
+    {
+        $lineUserId = trim($lineUserId);
+        $lineRichMenuId = trim($lineRichMenuId);
+
+        if ($lineUserId === '' || $lineRichMenuId === '') {
+            return false;
+        }
+
+        $response = Http::withToken($this->accessToken)
+            ->post('https://api.line.me/v2/bot/user/' . rawurlencode($lineUserId) . '/richmenu/' . rawurlencode($lineRichMenuId));
+
+        if (!$response->successful()) {
+            Log::warning('RichMenuService: linkToUser failed', [
+                'line_user_id' => $lineUserId,
+                'line_rich_menu_id' => $lineRichMenuId,
+                'status' => $response->status(),
+                'body' => $response->body(),
+            ]);
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * ユーザー個別のリッチメニューを解除し、デフォルト/共通メニューを適用させる
+     */
+    public function unlinkFromUser(string $lineUserId): bool
+    {
+        $lineUserId = trim($lineUserId);
+
+        if ($lineUserId === '') {
+            return false;
+        }
+
+        $response = Http::withToken($this->accessToken)
+            ->delete('https://api.line.me/v2/bot/user/' . rawurlencode($lineUserId) . '/richmenu');
+
+        if (!$response->successful()) {
+            // すでに個別メニューが無い場合も、期待する最終状態は「デフォルト適用」なので成功扱い。
+            if ($response->status() === 404) {
+                return true;
+            }
+
+            Log::warning('RichMenuService: unlinkFromUser failed', [
+                'line_user_id' => $lineUserId,
+                'status' => $response->status(),
+                'body' => $response->body(),
+            ]);
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * ユーザーの現在ランクに対応する有効な個別リッチメニューを取得
+     *
+     * @param  object|User  $user
+     */
+    public function findTargetForUser(object $user): ?RichMenu
+    {
+        $currentCardId = $user->current_card_id ?? null;
+        if (!$currentCardId) {
+            return null;
+        }
+
+        return RichMenu::query()
+            ->where('target_stamp_card_definition_id', $currentCardId)
+            ->whereNotNull('line_rich_menu_id')
+            ->whereIn('status', ['active', 'synced'])
+            ->orderByRaw("CASE WHEN status = 'active' THEN 0 ELSE 1 END")
+            ->latest('id')
+            ->first();
+    }
+
+    /**
+     * ユーザーの現在ランクに応じて個別リッチメニューを同期する
+     *
+     * @param  object|User  $user
+     */
+    public function syncForUser(object $user): bool
+    {
+        $lineUserId = trim((string) ($user->line_user_id ?? ''));
+        if ($lineUserId === '') {
+            Log::warning('RichMenuService: syncForUser skipped missing line_user_id', [
+                'user_id' => $user->id ?? null,
+            ]);
+            return false;
+        }
+
+        $richMenu = $this->findTargetForUser($user);
+        if ($richMenu) {
+            return $this->linkToUser($lineUserId, $richMenu->line_rich_menu_id);
+        }
+
+        return $this->unlinkFromUser($lineUserId);
     }
 
     /**

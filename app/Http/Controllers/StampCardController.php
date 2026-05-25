@@ -4,8 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Services\LineBotService;
 use App\Services\LotteryService;
+use App\Services\RichMenuService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class StampCardController extends Controller
 {
@@ -343,6 +345,23 @@ class StampCardController extends Controller
 
         // ⑥ 再取得
         $newUser = DB::table('users')->where('id', $user->id)->first();
+
+        try {
+            if (!app(RichMenuService::class)->syncForUser($newUser)) {
+                Log::warning('Rich menu sync for check-in user failed', [
+                    'user_id' => $newUser->id ?? null,
+                    'line_user_id' => $lineUserId,
+                    'current_card_id' => $newUser->current_card_id ?? null,
+                ]);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Rich menu sync for check-in user failed', [
+                'user_id' => $newUser->id ?? null,
+                'line_user_id' => $lineUserId,
+                'current_card_id' => $newUser->current_card_id ?? null,
+                'error' => $e->getMessage(),
+            ]);
+        }
 
         // チェックイン時クーポン処理（currentCard の checkin_coupon_id）
         if ($currentCardBeforeUpgrade && !empty($currentCardBeforeUpgrade->checkin_coupon_id)) {
