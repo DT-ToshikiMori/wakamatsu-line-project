@@ -14,11 +14,17 @@ class StampCardDefinition extends Model
         'theme_bg',
         'theme_accent',
         'theme_logo_opacity',
+        'show_stamp_marks',
         'is_active',
         'rankup_coupon_id',
         'rankup_coupon_expires_days',
         'checkin_coupon_id',
         'checkin_coupon_expires_days',
+    ];
+
+    protected $casts = [
+        'show_stamp_marks' => 'boolean',
+        'is_active' => 'boolean',
     ];
 
     public function store()

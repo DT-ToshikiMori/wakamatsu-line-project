@@ -76,6 +76,9 @@
     .big{font-size:44px;font-weight:900;margin:10px 0 2px}
     .big2{font-size:28px;font-weight:900;margin:6px 0 2px;opacity:.95}
     .muted{opacity:.75;font-size:12px}
+    .lastVisitRow{align-items:flex-end}
+    .lastVisitLabel{font-size:13px}
+    .lastVisitValue{font-size:16px;font-weight:800;opacity:.92;text-align:right}
     /* Beginner stamp (real stamp-like) */
     .stamps{
       display:flex;
@@ -299,21 +302,23 @@
       <div class="muted" id="nextText">ゴールドまで：あと {{ $remaining }} 回</div>
     @endif
 
-    <div class="stamps" id="stampsWrap" aria-label="rank-stamps">
-      @for($i=1;$i<=$goal;$i++)
-        @php
-          $rot = $i === 1 ? '-2deg' : ($i === 2 ? '2deg' : '-1deg');
-        @endphp
-        <div class="stamp {{ $i <= $progress ? 'on' : '' }}" data-i="{{ $i }}" style="--rot: {{ $rot }};">
-          <div class="stampText">STAMP</div>
-        </div>
-      @endfor
-    </div>
+    @if($currentCard->show_stamp_marks ?? true)
+      <div class="stamps" id="stampsWrap" aria-label="rank-stamps">
+        @for($i=1;$i<=$goal;$i++)
+          @php
+            $rot = $i === 1 ? '-2deg' : ($i === 2 ? '2deg' : '-1deg');
+          @endphp
+          <div class="stamp {{ $i <= $progress ? 'on' : '' }}" data-i="{{ $i }}" style="--rot: {{ $rot }};">
+            <div class="stampText">STAMP</div>
+          </div>
+        @endfor
+      </div>
+    @endif
 
     <div class="section">
-      <div class="row">
-        <div class="muted">最終来店</div>
-        <div class="muted" id="lastVisit">{{ $user->last_visit_at ?? '—' }}</div>
+      <div class="row lastVisitRow">
+        <div class="muted lastVisitLabel">最終来店</div>
+        <div class="muted lastVisitValue" id="lastVisit">{{ $user->last_visit_at ?? '—' }}</div>
       </div>
     </div>
 

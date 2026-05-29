@@ -59,6 +59,11 @@ class StampCardDefinitionResource extends Resource
                 ->minValue(0)
                 ->maxValue(1),
 
+            Forms\Components\Toggle::make('show_stamp_marks')
+                ->label('スタンプの丸をカード上に表示する')
+                ->helperText('OFFにすると、スタンプカード画面の丸いSTAMP表示を非表示にします。')
+                ->default(true),
+
             Forms\Components\Toggle::make('is_active')
                 ->label('有効')
                 ->default(true),
@@ -77,6 +82,7 @@ class StampCardDefinitionResource extends Resource
                 Tables\Columns\TextColumn::make('name')->label('識別名')->searchable(),
                 Tables\Columns\TextColumn::make('display_name')->label('表示名')->searchable(),
                 Tables\Columns\TextColumn::make('required_stamps')->label('必要数')->sortable(),
+                Tables\Columns\IconColumn::make('show_stamp_marks')->label('丸表示')->boolean()->sortable(),
                 Tables\Columns\IconColumn::make('is_active')->label('有効')->boolean()->sortable(),
                 Tables\Columns\TextColumn::make('updated_at')->label('更新')->dateTime('Y-m-d H:i')->sortable(),
             ])
