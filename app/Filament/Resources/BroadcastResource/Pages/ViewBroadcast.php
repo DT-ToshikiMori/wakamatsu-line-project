@@ -3,13 +3,11 @@
 namespace App\Filament\Resources\BroadcastResource\Pages;
 
 use App\Filament\Resources\BroadcastResource;
-use Filament\Resources\Pages\Concerns\InteractsWithRecord;
-use Filament\Resources\Pages\Page;
+use Filament\Resources\Pages\ViewRecord;
 use Illuminate\Support\Facades\DB;
 
-class ViewBroadcast extends Page
+class ViewBroadcast extends ViewRecord
 {
-    use InteractsWithRecord;
 
     protected static string $resource = BroadcastResource::class;
 
@@ -19,8 +17,7 @@ class ViewBroadcast extends Page
 
     public function mount(int | string $record): void
     {
-        $this->record = $this->resolveRecord($record);
-        $this->authorizeAccess();
+        parent::mount($record);
     }
 
     protected function getViewData(): array

@@ -44,8 +44,6 @@ class RichMenuClickController extends Controller
                 'user_id'           => $userId,
                 'line_user_id'      => $lineUserId,
                 'clicked_at'        => now(),
-                'created_at'        => now(),
-                'updated_at'        => now(),
             ]);
         } catch (\Throwable $e) {
             Log::warning('RichMenuClick: record failed', ['area_id' => $areaId, 'error' => $e->getMessage()]);

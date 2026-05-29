@@ -3,13 +3,11 @@
 namespace App\Filament\Resources\RichMenuResource\Pages;
 
 use App\Filament\Resources\RichMenuResource;
-use Filament\Resources\Pages\Concerns\InteractsWithRecord;
-use Filament\Resources\Pages\Page;
+use Filament\Resources\Pages\ViewRecord;
 use Illuminate\Support\Facades\DB;
 
-class ViewRichMenu extends Page
+class ViewRichMenu extends ViewRecord
 {
-    use InteractsWithRecord;
 
     protected static string $resource = RichMenuResource::class;
 
@@ -19,9 +17,8 @@ class ViewRichMenu extends Page
 
     public function mount(int | string $record): void
     {
-        $this->record = $this->resolveRecord($record);
+        parent::mount($record);
         $this->record->load('areas');
-        $this->authorizeAccess();
     }
 
     protected function getViewData(): array
