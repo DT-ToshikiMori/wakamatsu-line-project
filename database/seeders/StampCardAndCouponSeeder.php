@@ -57,33 +57,7 @@ class StampCardAndCouponSeeder extends Seeder
                 'theme_logo_opacity' => 0.08,
             ]);
 
-            // ② ランクアップクーポン（GOLD）
-            DB::table('coupon_templates')->insert([
-                'store_id' => $store->id,
-                'type' => 'rank_up',
-                'title' => 'GOLDランクアップクーポン',
-                'note' => 'GOLDランク昇格おめでとうございます。次回のお会計でご利用いただけます。',
-                'image_url' => 'https://placehold.co/900x300/png?text=GOLD+RANK+UP',
-                'rank_card_id' => $goldId,
-                'is_active' => true,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-
-            // ③ ランクアップクーポン（BLACK）
-            DB::table('coupon_templates')->insert([
-                'store_id' => $store->id,
-                'type' => 'rank_up',
-                'title' => 'BLACKランクアップクーポン',
-                'note' => 'BLACKランク昇格おめでとうございます。特別な特典をご利用ください。',
-                'image_url' => 'https://placehold.co/900x300/png?text=BLACK+RANK+UP',
-                'rank_card_id' => $blackId,
-                'is_active' => true,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-
-            // ④ 誕生日クーポン
+            // ② 誕生日クーポン
             DB::table('coupon_templates')->insert([
                 'store_id' => $store->id,
                 'type' => 'birthday',
@@ -96,7 +70,7 @@ class StampCardAndCouponSeeder extends Seeder
                 'updated_at' => now(),
             ]);
 
-            // ⑤ 離脱防止クーポン（30日後 10:00）
+            // ③ 離脱防止クーポン（30日後 10:00）
             DB::table('coupon_templates')->insert([
                 'store_id' => $store->id,
                 'type' => 'inactive',

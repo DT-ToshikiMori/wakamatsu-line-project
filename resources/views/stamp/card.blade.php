@@ -158,27 +158,6 @@
       color:transparent;
     }
     body.gold .goldMsgSub b{color:#fff}
-    /* Gold rank-up modal coupon card */
-    .couponMini{
-      margin-top:12px;
-      border-radius:18px;
-      overflow:hidden;
-      border:1px solid rgba(255,255,255,.12);
-      background: rgba(255,255,255,.06);
-      box-shadow: 0 16px 40px rgba(0,0,0,.35);
-    }
-    .couponMiniImg{
-      width:100%;
-      aspect-ratio: 3 / 1;
-      object-fit:cover;
-      display:block;
-      background:#111;
-    }
-    .couponMiniBody{padding:12px 14px}
-    .couponMiniTitle{font-weight:900;font-size:16px;letter-spacing:.03em}
-    .couponMiniNote{opacity:.8;font-size:12px;margin-top:6px;line-height:1.4}
-    .modalActions{display:grid;gap:10px;margin-top:14px}
-    .mbtn.secondary{background:transparent;color:#fff;border:1px solid rgba(255,255,255,.22)}
     .section{margin-top:16px}
     .row{display:flex;justify-content:space-between;gap:10px;align-items:center}
     .btn{
@@ -274,49 +253,6 @@
       border: 1px solid color-mix(in srgb, var(--theme-accent, #ffd54a) 35%, rgba(255,255,255,.12));
     }
 
-
-    .modal{
-      position:fixed; inset:0;
-      display:none; align-items:center; justify-content:center;
-      background: rgba(0,0,0,.55);
-      padding:18px;
-      z-index: 60;
-    }
-    .modal.on{display:flex}
-    .modal .m{
-      width:min(520px, 92vw);
-      border-radius:18px;
-      padding:16px;
-      background: rgba(20,20,26,.95);
-      border:1px solid rgba(255,215,0,.25);
-      box-shadow: 0 20px 60px rgba(0,0,0,.45);
-    }
-    .modal .title{
-      font-weight:900; letter-spacing:.06em;
-      background: linear-gradient(135deg, #ffe082, #ffb300);
-      -webkit-background-clip:text;
-      color:transparent;
-      font-size:20px;
-    }
-    .modal .p{opacity:.85; margin-top:8px; font-size:13px}
-    .modal .mbtn{
-      margin-top:14px;
-      width:100%;
-      padding:12px 14px;
-      border-radius:14px;
-      border:0;
-      background: linear-gradient(135deg, #ffd54a, #ffb300);
-      color:#1a1400;
-      font-weight:900;
-      cursor:pointer;
-      font-size:14px;
-    }
-    .modal a.mbtn{
-      display:block;
-      text-align:center;
-      text-decoration:none;
-      box-sizing:border-box;
-    }
   </style>
 </head>
 <body
@@ -387,24 +323,6 @@
 </div>
 
 
-<div class="modal" id="goldModal">
-  <div class="m">
-    <div class="title" id="rankupTitle">ランクアップ！</div>
-    <div class="couponMini" aria-label="rank-up-coupon">
-      <img class="couponMiniImg" id="rankupCouponImg" src="https://placehold.co/900x300/png?text=RANK+UP+COUPON" alt="coupon">
-      <div class="couponMiniBody">
-        <div class="couponMiniTitle" id="rankupCouponTitle">GOLDクーポン</div>
-        <div class="couponMiniNote" id="rankupCouponNote">次回のお会計でご利用いただけます。レジで提示してください。</div>
-      </div>
-    </div>
-
-    <div class="modalActions">
-      <a class="mbtn secondary" role="button" aria-label="クーポン一覧へ" href="/coupons?store={{ (int)$store->id }}">クーポン一覧へ</a>
-      <button class="mbtn secondary" id="goldOk" type="button">閉じる</button>
-    </div>
-  </div>
-</div>
-
 @include('partials.lottery-slot')
 @include('partials.tab-bar', ['tabStoreId' => (int)$store->id, 'tabActive' => 'card'])
 @include('partials.liff-init')
@@ -418,20 +336,11 @@
   const isBeginnerInitial = @json($isBeginner ?? false);
 
   const btn = document.getElementById('checkinBtn');
-  const goldModal = document.getElementById('goldModal');
-  const goldOk = document.getElementById('goldOk');
-  const rankupTitle = document.getElementById('rankupTitle');
-  const rankupCouponImg = document.getElementById('rankupCouponImg');
-  const rankupCouponTitle = document.getElementById('rankupCouponTitle');
-  const rankupCouponNote = document.getElementById('rankupCouponNote');
-
   const stampNow = document.getElementById('stampNow');
   const stampBig = document.getElementById('stampBig');
   const visitBig = document.getElementById('visitBig');
   const lastVisit = document.getElementById('lastVisit');
   const nextText = document.getElementById('nextText');
-  let pendingReloadAfterModal = false;
-
   function computeStateFromResponse(data){
     const cardProgress = (data.card_progress !== undefined && data.card_progress !== null)
       ? parseInt(data.card_progress, 10)
@@ -488,30 +397,7 @@
         });
       }
 
-      // Show rank-up modal and reload after close if upgraded
-      if (data.upgraded_to_gold) {
-        if (rankupTitle && data.upgraded_to) {
-          rankupTitle.textContent = `${data.upgraded_to} にランクアップ！`;
-        }
-
-        if (data.issued_coupon) {
-          if (rankupCouponImg && data.issued_coupon.image_url) {
-            rankupCouponImg.src = data.issued_coupon.image_url;
-          }
-          if (rankupCouponTitle && data.issued_coupon.title) {
-            rankupCouponTitle.textContent = data.issued_coupon.title;
-          }
-          if (rankupCouponNote) {
-            rankupCouponNote.textContent = data.issued_coupon.note || '';
-          }
-        }
-
-        pendingReloadAfterModal = true;
-        goldModal.classList.add('on');
-        return;
-      }
-
-      // If the rank/card changed but no modal is needed, reload to render the correct UI/goal
+      // If the rank/card changed, reload to render the correct UI/goal/rich-menu state.
       if (next.currentCardId && currentCardId && String(next.currentCardId) !== String(currentCardId)) {
         window.location.reload();
         return;
@@ -537,13 +423,6 @@
       console.error(e);
     } finally {
       btn.disabled = false;
-    }
-  });
-
-  goldOk.addEventListener('click', () => {
-    goldModal.classList.remove('on');
-    if (pendingReloadAfterModal) {
-      window.location.reload();
     }
   });
 

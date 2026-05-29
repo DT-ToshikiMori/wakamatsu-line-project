@@ -18,6 +18,7 @@ class ProcessMessageSchedules extends Command
             ->join('users as u', 'u.id', '=', 'ms.user_id')
             ->leftJoin('coupon_templates as ct', 'ct.id', '=', 'ms.coupon_template_id')
             ->where('ms.status', 'pending')
+            ->where('ms.schedule_type', '!=', 'rank_up')
             ->where('ms.run_at', '<=', now())
             ->select([
                 'ms.id',
@@ -76,8 +77,6 @@ class ProcessMessageSchedules extends Command
         return match ($schedule->schedule_type) {
             'birthday' => "{$name}さん、お誕生日おめでとうございます！\nバースデークーポンをプレゼントします。",
             'inactive' => "{$name}さん、お久しぶりです！\nまたのご来店をお待ちしております。",
-            'rank_up' => "{$name}さん、ランクアップおめでとうございます！"
-                . ($schedule->coupon_title ? "\nクーポン「{$schedule->coupon_title}」が発行されました。" : ''),
             'stamp' => "{$name}さん、スタンプが貯まりました！"
                 . ($schedule->coupon_title ? "\nクーポン「{$schedule->coupon_title}」をご確認ください。" : ''),
             default => "{$name}さんへのお知らせがあります。",

@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Services\LineBotService;
 use App\Services\LotteryService;
 use App\Services\RichMenuService;
 use Illuminate\Http\Request;
@@ -233,9 +232,6 @@ class StampCardController extends Controller
                 'current_card_id' => $result['newUser']->current_card_id,
                 'visit_count'     => (int) $result['newUser']->visit_count,
                 'last_visit_at'   => (string) $result['newUser']->last_visit_at,
-                'upgraded_to_gold'  => !empty($result['rankUpResults']),
-                'upgraded_to'       => $result['upgradedToDisplayName'],
-                'issued_coupon'     => $result['issuedCoupon'],
             ];
             if ($result['lotteryResult']) {
                 $response['lottery'] = $result['lotteryResult'];
@@ -265,12 +261,10 @@ class StampCardController extends Controller
         $visitedAt = now();
         $requestId = 'qr_' . bin2hex(random_bytes(8));
 
-        $rankUpResults = [];
-        $issuedCoupon = null;
         $lotteryResult = null;
         $currentCardBeforeUpgrade = null;
 
-        DB::transaction(function () use ($store, $user, $visitedAt, $requestId, $stampCount, $qrLinkId, &$rankUpResults, &$currentCardBeforeUpgrade) {
+        DB::transaction(function () use ($store, $user, $visitedAt, $requestId, $stampCount, $qrLinkId, &$currentCardBeforeUpgrade) {
 
             // ① visit log（店舗スコープ維持）
             DB::table('visits')->insert([
@@ -315,11 +309,6 @@ class StampCardController extends Controller
                 $nextCard = $cards->firstWhere('priority', $activeCard->priority + 1);
 
                 if ($nextCard) {
-                    // ランクアップ記録
-                    $rankUpResults[] = [
-                        'from_card' => $activeCard,
-                        'to_card' => $nextCard,
-                    ];
                     $remainingProgress = $remainingProgress - $activeCard->required_stamps;
                     $activeCard = $nextCard;
                 } else {
@@ -378,86 +367,13 @@ class StampCardController extends Controller
                 if (isset($checkinCouponResult['lottery'])) {
                     $lotteryResult = $checkinCouponResult['lottery'];
                 } elseif (isset($checkinCouponResult['coupon'])) {
-                    $issuedCoupon = $checkinCouponResult['coupon'];
+                    // 通常クーポンは発行のみ。カード画面での旧ランクアップ演出には使わない。
                 }
             }
         }
 
-        // マルチランクアップ時クーポン処理: 各ランクアップごとにクーポン発行
-        $upgradedToDisplayName = null;
-        foreach ($rankUpResults as $rankUp) {
-            $toCard = $rankUp['to_card'];
-            $upgradedToDisplayName = $toCard->display_name ?? $toCard->name ?? 'RANK UP';
-
-            if (!empty($toCard->rankup_coupon_id)) {
-                $rankupResult = $this->processCouponTrigger(
-                    null, $user->id, $lineUserId,
-                    $toCard->rankup_coupon_id,
-                    'rank_up',
-                    $toCard->rankup_coupon_expires_days ?? null
-                );
-                if ($rankupResult) {
-                    if (isset($rankupResult['lottery'])) {
-                        $lotteryResult = $rankupResult['lottery'];
-                    } elseif (isset($rankupResult['coupon'])) {
-                        $issuedCoupon = $rankupResult['coupon'];
-                    }
-                }
-            } else {
-                // 旧方式: coupon_templates の type=rank_up & rank_card_id で検索
-                $tpl = DB::table('coupon_templates')
-                    ->where('type', 'rank_up')
-                    ->where('rank_card_id', $toCard->id)
-                    ->where('is_active', true)
-                    ->orderByDesc('id')
-                    ->first();
-
-                if ($tpl) {
-                    if (($tpl->mode ?? 'normal') === 'lottery') {
-                        $lotteryResult = app(LotteryService::class)->draw(null, $user->id, $tpl->id, 'rank_up');
-                    } else {
-                        $userCouponId = DB::table('user_coupons')->insertGetId([
-                            'store_id' => null,
-                            'user_id' => $user->id,
-                            'coupon_template_id' => $tpl->id,
-                            'message_bubble_id' => null,
-                            'status' => 'issued',
-                            'issued_at' => now(),
-                            'used_at' => null,
-                            'expires_at' => null,
-                            'created_at' => now(),
-                            'updated_at' => now(),
-                        ]);
-
-                        DB::table('coupon_events')->insert([
-                            'user_coupon_id' => $userCouponId,
-                            'event' => 'issued',
-                            'actor' => 'system',
-                            'created_at' => now(),
-                        ]);
-
-                        $issuedCoupon = [
-                            'user_coupon_id' => $userCouponId,
-                            'title' => $tpl->title,
-                            'note' => $tpl->note,
-                            'image_url' => $tpl->image_url,
-                        ];
-                    }
-                }
-            }
-        }
-
-        // プッシュ通知（ランクアップがあった場合）
-        if (!empty($rankUpResults)) {
-            try {
-                $msg = $issuedCoupon
-                    ? "🎉 {$upgradedToDisplayName}にランクアップしました！クーポン「{$issuedCoupon['title']}」が発行されました。"
-                    : "🎉 {$upgradedToDisplayName}にランクアップしました！おめでとうございます！";
-                app(LineBotService::class)->pushText($lineUserId, $msg);
-            } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::warning('Push notification failed', ['error' => $e->getMessage()]);
-            }
-        }
+        // ランクアップ時の旧演出・旧クーポン発行は廃止済み。
+        // ランク更新とリッチメニュー切替のみ行い、ユーザー向け通知は来店シナリオ側に集約する。
 
         // 来店シナリオ: visit_scenario_sends に scheduled_at を積む
         $visitCount = (int) $newUser->visit_count;
@@ -536,11 +452,8 @@ class StampCardController extends Controller
         }
 
         return [
-            'newUser'               => $newUser,
-            'rankUpResults'         => $rankUpResults,
-            'issuedCoupon'          => $issuedCoupon,
-            'lotteryResult'         => $lotteryResult,
-            'upgradedToDisplayName' => $upgradedToDisplayName,
+            'newUser'       => $newUser,
+            'lotteryResult' => $lotteryResult,
         ];
     }
 
