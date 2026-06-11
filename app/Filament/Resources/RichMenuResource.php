@@ -67,7 +67,7 @@ class RichMenuResource extends Resource
                         ->default('')
                         ->afterStateHydrated(fn (Forms\Components\Radio $component, $state) => $component->state($state ?? ''))
                         ->dehydrateStateUsing(fn ($state) => blank($state) ? null : $state)
-                        ->helperText('未選択の場合は共通メニューとして扱います。LINEユーザーへの出し分け連携は別途実装します。')
+                        ->helperText('未選択の場合は共通メニューとして扱います。ランクを選ぶとチェックイン後や同期コマンドで対象ユーザーへ個別リンクされます。')
                         ->columnSpanFull(),
                 ]),
 
@@ -230,11 +230,15 @@ class RichMenuResource extends Resource
                 Tables\Actions\Action::make('view')
                     ->label('分析')
                     ->icon('heroicon-o-chart-bar')
+                    ->iconButton()
+                    ->tooltip('分析')
                     ->url(fn (RichMenu $record) => static::getUrl('view', ['record' => $record])),
 
                 Tables\Actions\Action::make('sync')
                     ->label('LINEに同期')
                     ->icon('heroicon-o-arrow-up-tray')
+                    ->iconButton()
+                    ->tooltip('LINEに同期')
                     ->color('info')
                     ->requiresConfirmation()
                     ->modalHeading('LINE同期確認')
@@ -257,11 +261,13 @@ class RichMenuResource extends Resource
                 Tables\Actions\Action::make('setDefault')
                     ->label('デフォルトに設定')
                     ->icon('heroicon-o-star')
+                    ->iconButton()
+                    ->tooltip('デフォルトに設定')
                     ->color('warning')
                     ->requiresConfirmation()
                     ->modalHeading('デフォルト設定確認')
-                    ->modalDescription('このリッチメニューを全ユーザーのデフォルトに設定しますか？')
-                    ->visible(fn (RichMenu $record) => $record->line_rich_menu_id && !$record->is_default)
+                    ->modalDescription('この共通リッチメニューを全ユーザーのデフォルトに設定しますか？')
+                    ->visible(fn (RichMenu $record) => $record->line_rich_menu_id && !$record->is_default && !$record->target_stamp_card_definition_id)
                     ->action(function (RichMenu $record) {
                         $service = app(RichMenuService::class);
                         if ($service->setDefault($record->line_rich_menu_id)) {
@@ -286,7 +292,9 @@ class RichMenuResource extends Resource
                         }
                     }),
 
-                Tables\Actions\EditAction::make(),
+                Tables\Actions\EditAction::make()
+                    ->iconButton()
+                    ->tooltip('編集'),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([

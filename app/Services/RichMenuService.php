@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\RichMenu;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -281,6 +282,50 @@ class RichMenuService
     }
 
     /**
+     * ランク別リッチメニューを同期し直したとき、既存ユーザーの個別リンクも新しいLINE IDへ貼り直す
+     *
+     * @return array{success:int,failed:int,seen:int}
+     */
+    public function relinkUsersForRichMenu(RichMenu $richMenu): array
+    {
+        $targetCardId = $richMenu->target_stamp_card_definition_id;
+        $lineRichMenuId = trim((string) $richMenu->line_rich_menu_id);
+
+        if (!$targetCardId || $lineRichMenuId === '') {
+            return ['success' => 0, 'failed' => 0, 'seen' => 0];
+        }
+
+        $successCount = 0;
+        $failedCount = 0;
+        $seenCount = 0;
+
+        DB::table('users')
+            ->select(['id', 'line_user_id'])
+            ->where('current_card_id', $targetCardId)
+            ->whereNotNull('line_user_id')
+            ->where('line_user_id', '!=', '')
+            ->orderBy('id')
+            ->chunkById(200, function ($users) use ($lineRichMenuId, &$successCount, &$failedCount, &$seenCount) {
+                foreach ($users as $user) {
+                    $seenCount++;
+
+                    if ($this->linkToUser($user->line_user_id, $lineRichMenuId)) {
+                        $successCount++;
+                        continue;
+                    }
+
+                    $failedCount++;
+                }
+            });
+
+        return [
+            'success' => $successCount,
+            'failed' => $failedCount,
+            'seen' => $seenCount,
+        ];
+    }
+
+    /**
      * LINE APIからリッチメニューを削除
      */
     public function deleteFromLine(string $lineRichMenuId): bool
@@ -309,7 +354,8 @@ class RichMenuService
     public function syncToLine(RichMenu $richMenu): bool
     {
         $oldLineRichMenuId = $richMenu->line_rich_menu_id;
-        $wasDefault = (bool) $richMenu->is_default || $richMenu->status === 'active';
+        $isCommonMenu = blank($richMenu->target_stamp_card_definition_id);
+        $wasDefault = $isCommonMenu && ((bool) $richMenu->is_default || $richMenu->status === 'active');
 
         // 1. リッチメニュー作成
         $lineId = $this->createOnLine($richMenu);
@@ -325,7 +371,7 @@ class RichMenuService
             }
         }
 
-        // 3. デフォルトだったメニューは新しいLINE IDをデフォルトに付け替える
+        // 3. 共通のデフォルトメニューだけ、新しいLINE IDをデフォルトに付け替える
         if ($wasDefault && !$this->setDefault($lineId)) {
             $this->deleteFromLine($lineId);
             return false;
@@ -338,11 +384,20 @@ class RichMenuService
             'synced_at' => now(),
         ]);
 
+        $richMenu->forceFill([
+            'line_rich_menu_id' => $lineId,
+            'status' => $wasDefault ? 'active' : 'synced',
+            'synced_at' => now(),
+        ]);
+
+        $relinkResult = $this->relinkUsersForRichMenu($richMenu);
+
         if ($oldLineRichMenuId) {
             Log::info('RichMenuService: old LINE rich menu retained after sync', [
                 'rich_menu_id' => $richMenu->id,
                 'old_line_rich_menu_id' => $oldLineRichMenuId,
                 'new_line_rich_menu_id' => $lineId,
+                'relinked_users' => $relinkResult,
             ]);
         }
 
