@@ -99,6 +99,7 @@
       const isLoggedIn = liff.isLoggedIn();
       log('isInClient: ' + isInClient);
       log('isLoggedIn: ' + isLoggedIn);
+      log('context: ' + JSON.stringify(liff.getContext ? liff.getContext() : null));
 
       if (!isLoggedIn) {
         if (isInClient) {
@@ -125,8 +126,13 @@
           await liff.requestFriendship();
           log('requestFriendship() 完了');
         } catch (e) {
-          log('requestFriendship() skipped: ' + (e?.code || e?.message || String(e)));
+          log('requestFriendship() failed: ' + JSON.stringify({
+            code: e?.code || null,
+            message: e?.message || String(e),
+          }));
         }
+      } else {
+        log('requestFriendship() unavailable');
       }
 
       // ログイン済み → IDトークン取得

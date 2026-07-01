@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use App\Models\AppSetting;
+use App\Models\Store;
 use Filament\Actions\Action;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -28,6 +29,7 @@ class LineSettings extends Page
             'line_bot_channel_id',
             'line_login_channel_id',
             'liff_id',
+            'line_default_store_id',
         ];
         $this->data = [];
         foreach ($keys as $key) {
@@ -102,6 +104,16 @@ class LineSettings extends Page
                                         'x-on:click' => 'navigator.clipboard.writeText($el.closest(\'[data-field]\')?.querySelector(\'input\')?.value ?? \'\')',
                                     ])
                             ),
+                        Forms\Components\Select::make('line_default_store_id')
+                            ->label('ミニアプリ入口のデフォルト店舗')
+                            ->options(fn (): array => Store::query()
+                                ->where('is_active', true)
+                                ->orderBy('id')
+                                ->pluck('name', 'id')
+                                ->all())
+                            ->searchable()
+                            ->nullable()
+                            ->helperText('QRなしでミニアプリを開いた時、この店舗として表示します。未設定の場合は既存ユーザーの店舗を使います。'),
                     ]),
             ])
             ->statePath('data');

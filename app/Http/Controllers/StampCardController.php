@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Services\LotteryService;
 use App\Services\RichMenuService;
+use App\Models\AppSetting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -566,6 +567,8 @@ class StampCardController extends Controller
             $storeId = (int) $qrLink->store_id;
         } elseif ($routeStore) {
             $storeId = $routeStore;
+        } elseif ($defaultStoreId = (int) AppSetting::get('line_default_store_id', 0)) {
+            $storeId = $defaultStoreId;
         } elseif ($user && $user->store_id) {
             $storeId = (int) $user->store_id;
         } else {
