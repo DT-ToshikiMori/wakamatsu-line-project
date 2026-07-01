@@ -40,16 +40,6 @@
       line-height:1.5;
       word-break:break-all;
     }
-    .debug{
-      margin-top:16px;
-      font-size:11px;
-      opacity:.4;
-      text-align:left;
-      max-width:340px;
-      margin-left:auto;
-      margin-right:auto;
-      line-height:1.6;
-    }
   </style>
 </head>
 <body>
@@ -57,7 +47,6 @@
     <div class="spinner" id="spinner"></div>
     <div class="msg" id="msg">LINE認証中...</div>
     <div class="err" id="err"></div>
-    <div class="debug" id="debug"></div>
   </div>
 
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
@@ -67,14 +56,12 @@
     const msg = document.getElementById('msg');
     const err = document.getElementById('err');
     const spinner = document.getElementById('spinner');
-    const debug = document.getElementById('debug');
 
     // liff.init() 前に liff.state（遷移先パス）を保存
     const liffState = new URLSearchParams(window.location.search).get('liff.state');
 
     function log(text) {
-      debug.textContent += text + '\n';
-      console.log('[liff-auth]', text);
+      // Intentionally hidden in production UI.
     }
 
     function fail(message, detail) {
