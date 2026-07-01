@@ -251,34 +251,6 @@
 
 @include('partials.liff-init')
 <script>
-  const LIFF_ID = @json(config('services.line.liff_id'));
-
-  async function requestFriendshipBeforeRegistration() {
-    if (!LIFF_ID || !window.liff || typeof liff.requestFriendship !== 'function') {
-      return;
-    }
-
-    const storageKey = `friendship_request_shown:${LIFF_ID}`;
-    if (sessionStorage.getItem(storageKey)) {
-      return;
-    }
-
-    try {
-      await liff.ready;
-
-      if (!liff.isInClient()) {
-        return;
-      }
-
-      sessionStorage.setItem(storageKey, '1');
-      await liff.requestFriendship();
-    } catch (e) {
-      console.warn('requestFriendship skipped:', e.message || e);
-    }
-  }
-
-  requestFriendshipBeforeRegistration();
-
   // Radio button selection styling
   document.querySelectorAll('#visitFreqRadios label').forEach(label => {
     label.addEventListener('click', () => {

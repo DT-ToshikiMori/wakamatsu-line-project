@@ -119,6 +119,16 @@
         return;
       }
 
+      if (isInClient && typeof liff.requestFriendship === 'function') {
+        try {
+          log('requestFriendship() 開始...');
+          await liff.requestFriendship();
+          log('requestFriendship() 完了');
+        } catch (e) {
+          log('requestFriendship() skipped: ' + (e?.code || e?.message || String(e)));
+        }
+      }
+
       // ログイン済み → IDトークン取得
       const idToken = liff.getIDToken();
       log('idToken: ' + (idToken ? idToken.substring(0, 20) + '...' : 'null'));
