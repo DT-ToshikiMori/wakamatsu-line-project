@@ -162,17 +162,11 @@
       const dest = liffState
         || (window.location.pathname !== '/' ? window.location.pathname + window.location.search : null)
         || window.location.hash.replace(/^#/, '')
-        || null;
+        || '/card';
 
       log('dest: ' + dest);
 
-      if (dest) {
-        window.location.replace(dest);
-      } else {
-        // 遷移先なし → 認証完了表示
-        spinner.style.display = 'none';
-        msg.textContent = '認証が完了しました';
-      }
+      window.location.replace(dest);
 
     } catch (e) {
       console.error('LIFF auth error:', e);
