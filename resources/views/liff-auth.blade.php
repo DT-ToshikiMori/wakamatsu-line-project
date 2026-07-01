@@ -120,19 +120,24 @@
         return;
       }
 
-      if (isInClient && typeof liff.requestFriendship === 'function') {
+      if (isInClient && liff.permission?.query && liff.permission?.requestAll) {
         try {
-          log('requestFriendship() 開始...');
-          await liff.requestFriendship();
-          log('requestFriendship() 完了');
+          const profilePermission = await liff.permission.query('profile');
+          log('profile permission: ' + JSON.stringify(profilePermission));
+
+          if (profilePermission?.state === 'prompt') {
+            log('permission.requestAll() 開始...');
+            await liff.permission.requestAll();
+            log('permission.requestAll() 完了');
+          }
         } catch (e) {
-          log('requestFriendship() failed: ' + JSON.stringify({
+          log('permission request failed: ' + JSON.stringify({
             code: e?.code || null,
             message: e?.message || String(e),
           }));
         }
       } else {
-        log('requestFriendship() unavailable');
+        log('permission request unavailable');
       }
 
       // ログイン済み → IDトークン取得
