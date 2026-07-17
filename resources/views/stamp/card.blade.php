@@ -322,8 +322,6 @@
       </div>
     </div>
 
-    <button class="btn" id="checkinBtn" type="button">チェックイン（スタンプ+1）</button>
-    <button class="btn secondary" id="clearBtn" type="button" style="font-size:12px;padding:10px 14px;margin-top:8px;">スタンプをクリア（テスト用）</button>
   </div>
 </div>
 
@@ -378,7 +376,8 @@
     });
   }
 
-  btn.addEventListener('click', async () => {
+  if (btn) {
+    btn.addEventListener('click', async () => {
     btn.disabled = true;
 
     try {
@@ -429,7 +428,8 @@
     } finally {
       btn.disabled = false;
     }
-  });
+    });
+  }
 
   // クリアボタン
   const clearBtn = document.getElementById('clearBtn');
