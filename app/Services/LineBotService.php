@@ -11,7 +11,7 @@ class LineBotService
 
     public function __construct()
     {
-        $this->accessToken = config('services.line.bot_channel_access_token', '');
+        $this->accessToken = (string) config('services.line.bot_channel_access_token', '');
     }
 
     /**

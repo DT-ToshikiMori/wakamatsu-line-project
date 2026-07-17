@@ -44,6 +44,60 @@ class MessageService
         }
     }
 
+    /**
+     * バブル配列からLINE Messaging APIへ渡すmessages配列を構築する。
+     * クーポンは通知のみで、発行はユーザーの取得アクション時に行う。
+     */
+    public function buildMessages(array $bubbles, ?int $sentAt = null): array
+    {
+        $messages = [];
+        $sentAt ??= now()->timestamp;
+
+        foreach ($bubbles as $bubble) {
+            if ($bubble->bubble_type === 'text' && !empty($bubble->text_content)) {
+                $messages[] = [
+                    'type' => 'text',
+                    'text' => $bubble->text_content,
+                ];
+                continue;
+            }
+
+            if ($bubble->bubble_type !== 'coupon' || empty($bubble->coupon_template_id)) {
+                continue;
+            }
+
+            $tpl = DB::table('coupon_templates')
+                ->where('id', $bubble->coupon_template_id)
+                ->where('is_active', true)
+                ->first();
+
+            if (!$tpl) {
+                continue;
+            }
+
+            $liffId = config('services.line.liff_id');
+            $claimUrl = "https://liff.line.me/{$liffId}/coupons/claim?" . http_build_query([
+                'bubble_id' => $bubble->id,
+                'tpl_id' => $tpl->id,
+                'sent_at' => $sentAt,
+            ]);
+
+            $messages[] = [
+                'type' => 'flex',
+                'altText' => "クーポン: {$tpl->title}",
+                'contents' => $this->buildCouponFlexContents(
+                    $tpl->title,
+                    $tpl->note ?? '',
+                    CouponTemplate::resolveImageUrl($tpl->image_url),
+                    $this->buildExpiresText($bubble),
+                    $claimUrl
+                ),
+            ];
+        }
+
+        return $messages;
+    }
+
     private function sendTextBubble(object $user, object $bubble): void
     {
         if (empty($bubble->text_content)) {
@@ -55,33 +109,11 @@ class MessageService
 
     private function sendCouponBubble(object $user, object $bubble): void
     {
-        if (empty($bubble->coupon_template_id)) {
-            return;
+        $messages = $this->buildMessages([$bubble]);
+
+        if (!empty($messages)) {
+            $this->lineBotService->multicast([$user->line_user_id], $messages);
         }
-
-        $tpl = DB::table('coupon_templates')
-            ->where('id', $bubble->coupon_template_id)
-            ->where('is_active', true)
-            ->first();
-
-        if (!$tpl) {
-            return;
-        }
-
-        $expiresText = $this->buildExpiresText($bubble);
-
-        $liffId = config('services.line.liff_id');
-        $claimUrl = "https://liff.line.me/{$liffId}/coupons/claim?" . http_build_query([
-            'bubble_id' => $bubble->id,
-            'tpl_id' => $tpl->id,
-            'sent_at' => now()->timestamp,
-        ]);
-
-        $this->lineBotService->pushFlexMessage(
-            $user->line_user_id,
-            "クーポン: {$tpl->title}",
-            $this->buildCouponFlexContents($tpl->title, $tpl->note ?? '', CouponTemplate::resolveImageUrl($tpl->image_url), $expiresText, $claimUrl)
-        );
     }
 
     private function buildExpiresText(object $bubble): ?string

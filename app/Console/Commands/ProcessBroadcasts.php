@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Services\LineBotService;
 use App\Services\MessageService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -12,7 +13,7 @@ class ProcessBroadcasts extends Command
     protected $signature = 'messages:process-broadcasts';
     protected $description = '予定時刻を過ぎた自由配信メッセージを処理';
 
-    public function handle(MessageService $messageService): int
+    public function handle(MessageService $messageService, LineBotService $lineBotService): int
     {
         $now = now();
 
@@ -28,13 +29,13 @@ class ProcessBroadcasts extends Command
         }
 
         foreach ($broadcasts as $broadcast) {
-            $this->processBroadcast($broadcast, $messageService);
+            $this->processBroadcast($broadcast, $messageService, $lineBotService);
         }
 
         return self::SUCCESS;
     }
 
-    private function processBroadcast(object $broadcast, MessageService $messageService): void
+    private function processBroadcast(object $broadcast, MessageService $messageService, LineBotService $lineBotService): void
     {
         // バブル取得
         $bubbles = DB::table('message_bubbles')
@@ -101,34 +102,55 @@ class ProcessBroadcasts extends Command
                   ->where('last_visit_at', '<', $cutoff);
         }
 
-        $users = $query->get();
+        $sentAt = now();
+        $messages = $messageService->buildMessages($bubbles, $sentAt->timestamp);
+        if (empty($messages)) {
+            $this->warn("Broadcast #{$broadcast->id} has no deliverable messages, skipping");
+            DB::table('broadcasts')->where('id', $broadcast->id)->update([
+                'status' => 'sent',
+                'sent_at' => $sentAt,
+                'updated_at' => now(),
+            ]);
+            return;
+        }
+
         $sentCount = 0;
 
-        foreach ($users as $user) {
-            try {
-                $messageService->sendToUser($user->id, $bubbles, 'manual');
+        $query
+            ->select(['id', 'line_user_id'])
+            ->orderBy('id')
+            ->chunkById(500, function ($users) use ($broadcast, $lineBotService, $messages, $sentAt, &$sentCount) {
+                $lineUserIds = $users->pluck('line_user_id')->filter()->values()->all();
+                if (empty($lineUserIds)) {
+                    return;
+                }
 
-                // broadcast_logs に記録
-                DB::table('broadcast_logs')->insert([
-                    'broadcast_id' => $broadcast->id,
-                    'user_id' => $user->id,
-                    'sent_at' => now(),
-                ]);
+                try {
+                    if (!$lineBotService->multicast($lineUserIds, $messages)) {
+                        return;
+                    }
 
-                $sentCount++;
-            } catch (\Throwable $e) {
-                Log::error('ProcessBroadcasts: send failed', [
-                    'broadcast_id' => $broadcast->id,
-                    'user_id' => $user->id,
-                    'error' => $e->getMessage(),
-                ]);
-            }
-        }
+                    $logs = $users->map(fn ($user) => [
+                        'broadcast_id' => $broadcast->id,
+                        'user_id' => $user->id,
+                        'sent_at' => $sentAt,
+                    ])->all();
+
+                    DB::table('broadcast_logs')->insert($logs);
+                    $sentCount += count($logs);
+                } catch (\Throwable $e) {
+                    Log::error('ProcessBroadcasts: send failed', [
+                        'broadcast_id' => $broadcast->id,
+                        'count' => count($lineUserIds),
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            });
 
         // ステータス更新
         DB::table('broadcasts')->where('id', $broadcast->id)->update([
             'status' => 'sent',
-            'sent_at' => now(),
+            'sent_at' => $sentAt,
             'sent_count' => $sentCount,
             'updated_at' => now(),
         ]);
