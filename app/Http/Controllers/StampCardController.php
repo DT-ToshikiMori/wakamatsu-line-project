@@ -68,18 +68,10 @@ class StampCardController extends Controller
         }
 
         // QRスキャン自動チェックイン
-        // qr_link_id があり、stamped=1 でなく、直近5分以内の重複スキャンでなければ実行
+        // qr_link_id があり、stamped=1 でなければ実行。同じQRの連続読み込みも来店として扱う。
         $qrLinkId = $req->integer('qr_link_id');
         if ($qrLinkId && !$req->boolean('stamped')) {
-            $recentVisit = DB::table('visits')
-                ->where('user_id', $user->id)
-                ->where('qr_link_id', $qrLinkId)
-                ->where('visited_at', '>=', now()->subMinutes(5))
-                ->exists();
-
-            if (!$recentVisit) {
-                $this->performCheckin($storeId, $user, $lineUserId, $qrLinkId);
-            }
+            $this->performCheckin($storeId, $user, $lineUserId, $qrLinkId);
 
             // stamped=1 を付けてリダイレクト（重複実行防止）
             return redirect('/card?ok=1&stamped=1');
