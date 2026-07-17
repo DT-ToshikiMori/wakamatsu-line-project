@@ -34,6 +34,7 @@
 
       if (liff.isLoggedIn()) {
         _liffIdToken = liff.getIDToken();
+        await requestFriendshipIfNeeded();
       }
 
       // この時点でページはセッション認証済みで表示されているので
@@ -44,6 +45,22 @@
       console.warn('LIFF init (on page):', e.message);
       // ページ自体はセッション認証で表示済みなので、LIFF SDK失敗は致命的ではない
       if (overlay) overlay.style.display = 'none';
+    }
+  }
+
+  async function requestFriendshipIfNeeded() {
+    if (!liff.isInClient?.() || !liff.getFriendship || !liff.requestFriendship) {
+      return;
+    }
+
+    try {
+      const friendship = await liff.getFriendship();
+
+      if (!friendship?.friendFlag) {
+        await liff.requestFriendship();
+      }
+    } catch (e) {
+      console.warn('LIFF friendship request skipped:', e.message || String(e));
     }
   }
 
