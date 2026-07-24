@@ -73,8 +73,12 @@ class StampCardController extends Controller
         if ($qrLinkId && !$req->boolean('stamped')) {
             $this->performCheckin($storeId, $user, $lineUserId, $qrLinkId);
 
-            // stamped=1 を付けてリダイレクト（重複実行防止）
-            return redirect('/card?ok=1&stamped=1');
+            // stamped=1 を付けてリダイレクト（重複実行防止）。表示店舗維持のためQR情報も引き継ぐ。
+            return redirect('/card?' . http_build_query([
+                'qr_link_id' => $qrLinkId,
+                'ok' => 1,
+                'stamped' => 1,
+            ]));
         }
 
         // ① ランク定義（グローバル、priority順）
