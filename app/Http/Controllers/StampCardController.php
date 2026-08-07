@@ -49,6 +49,9 @@ class StampCardController extends Controller
         } else {
             // プロフィール情報を更新
             $updates = [];
+            if ($this->hasExplicitStoreContext($req, $store) && (int) $user->store_id !== $storeId) {
+                $updates['store_id'] = $storeId;
+            }
             if ($displayName && $displayName !== $user->display_name) {
                 $updates['display_name'] = $displayName;
             }
@@ -563,10 +566,10 @@ class StampCardController extends Controller
             $storeId = (int) $qrLink->store_id;
         } elseif ($routeStore) {
             $storeId = $routeStore;
-        } elseif ($defaultStoreId = (int) AppSetting::get('line_default_store_id', 0)) {
-            $storeId = $defaultStoreId;
         } elseif ($user && $user->store_id) {
             $storeId = (int) $user->store_id;
+        } elseif ($defaultStoreId = (int) AppSetting::get('line_default_store_id', 0)) {
+            $storeId = $defaultStoreId;
         } else {
             $storeId = 1;
         }
@@ -575,6 +578,11 @@ class StampCardController extends Controller
         abort_if(!$store, 404, 'store not found');
 
         return $store;
+    }
+
+    private function hasExplicitStoreContext(Request $req, ?int $routeStore = null): bool
+    {
+        return (bool) ($routeStore || ($req->integer('qr_link_id') ?: null));
     }
 
     private function cardUrl(?int $qrLinkId = null): string
