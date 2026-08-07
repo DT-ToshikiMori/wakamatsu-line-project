@@ -568,6 +568,8 @@ class StampCardController extends Controller
             $storeId = $routeStore;
         } elseif ($user && $user->store_id) {
             $storeId = (int) $user->store_id;
+        } elseif ($user && $lastVisitStoreId = $this->lastVisitStoreId((int) $user->id)) {
+            $storeId = $lastVisitStoreId;
         } elseif ($defaultStoreId = (int) AppSetting::get('line_default_store_id', 0)) {
             $storeId = $defaultStoreId;
         } else {
@@ -578,6 +580,18 @@ class StampCardController extends Controller
         abort_if(!$store, 404, 'store not found');
 
         return $store;
+    }
+
+    private function lastVisitStoreId(int $userId): ?int
+    {
+        $storeId = DB::table('visits')
+            ->where('user_id', $userId)
+            ->whereNotNull('store_id')
+            ->orderByDesc('visited_at')
+            ->orderByDesc('id')
+            ->value('store_id');
+
+        return $storeId ? (int) $storeId : null;
     }
 
     private function hasExplicitStoreContext(Request $req, ?int $routeStore = null): bool
