@@ -49,6 +49,13 @@ class LineUserResource extends Resource
                     ->label('誕生月')
                     ->options(collect(range(1, 12))->mapWithKeys(fn ($m) => [$m => $m . '月']))
                     ->nullable(),
+
+                Forms\Components\TextInput::make('postal_code')
+                    ->label('郵便番号')
+                    ->length(7)
+                    ->rule('nullable')
+                    ->rule('digits:7')
+                    ->nullable(),
             ]);
     }
 
@@ -93,6 +100,11 @@ class LineUserResource extends Resource
                     ->formatStateUsing(fn (?int $state) => $state ? $state . '月' : '未登録')
                     ->toggleable(isToggledHiddenByDefault: true),
 
+                Tables\Columns\TextColumn::make('postal_code')
+                    ->label('郵便番号')
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+
                 Tables\Columns\TextColumn::make('visit_count')
                     ->label('来店回数')
                     ->sortable(),
@@ -118,7 +130,7 @@ class LineUserResource extends Resource
                             // Excel文字化け対策（UTF-8 BOM）
                             fwrite($out, "\xEF\xBB\xBF");
 
-                            fputcsv($out, ['store', 'display_name', 'line_user_id', 'gender', 'birth_year', 'birth_month', 'visit_count', 'last_visit_at']);
+                            fputcsv($out, ['store', 'display_name', 'line_user_id', 'gender', 'birth_year', 'birth_month', 'postal_code', 'visit_count', 'last_visit_at']);
 
                             $query->chunk(500, function ($rows) use ($out) {
                                 foreach ($rows as $u) {
@@ -137,6 +149,7 @@ class LineUserResource extends Resource
                                         $genderLabel,
                                         (string)($u->birth_year ?? ''),
                                         $u->birth_month ? $u->birth_month . '月' : '',
+                                        $u->postal_code ?? '',
                                         (string)($u->visit_count ?? 0),
                                         $last ? $last->format('Y-m-d H:i:s') : '',
                                     ]);

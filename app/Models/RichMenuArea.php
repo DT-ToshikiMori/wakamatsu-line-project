@@ -16,6 +16,11 @@ class RichMenuArea extends Model
         'height',
         'action_type',
         'action_data',
+        'open_external_browser',
+    ];
+
+    protected $casts = [
+        'open_external_browser' => 'boolean',
     ];
 
     public function richMenu()

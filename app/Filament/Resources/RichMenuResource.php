@@ -117,7 +117,7 @@ class RichMenuResource extends Resource
                         ->label('')
                         ->relationship()
                         ->schema([
-                            Forms\Components\Grid::make(5)
+                            Forms\Components\Grid::make(6)
                                 ->schema([
                                     Forms\Components\TextInput::make('label')
                                         ->label('ラベル')
@@ -145,6 +145,13 @@ class RichMenuResource extends Resource
                                         })
                                         ->required(fn ($get) => in_array($get('action_type'), ['uri', 'message']))
                                         ->columnSpan(2),
+
+                                    Forms\Components\Toggle::make('open_external_browser')
+                                        ->label('外部ブラウザ')
+                                        ->helperText('ONの場合、LINE同期時のURLに openExternalBrowser=1 を付けます')
+                                        ->visible(fn ($get) => $get('action_type') === 'uri')
+                                        ->default(false)
+                                        ->columnSpan(1),
                                 ]),
 
                             // 座標（デフォルト非表示）

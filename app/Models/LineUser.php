@@ -13,6 +13,7 @@ class LineUser extends Model
         'first_visit_at' => 'datetime',
         'birth_year' => 'integer',
         'birth_month' => 'integer',
+        'postal_code' => 'string',
     ];
 
     public function store()

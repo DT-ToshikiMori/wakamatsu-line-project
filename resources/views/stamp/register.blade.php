@@ -105,7 +105,8 @@
       border-color:rgba(245,196,81,.6);
       background:rgba(245,196,81,.12);
     }
-    select{
+    select,
+    input[type="text"]{
       width:100%;
       padding:10px 12px;
       border-radius:12px;
@@ -114,9 +115,15 @@
       color:#fff;
       font-size:14px;
       font-weight:600;
+      box-sizing:border-box;
+    }
+    select{
       appearance:none;
       -webkit-appearance:none;
       cursor:pointer;
+    }
+    input[type="text"]::placeholder{
+      color:rgba(255,255,255,.35);
     }
     select option{
       background:#1a1a20;
@@ -242,6 +249,23 @@
             <option value="{{ $m }}" {{ (int)old('birth_month') === $m ? 'selected' : '' }}>{{ $m }}月</option>
           @endfor
         </select>
+      </div>
+
+      <div class="field">
+        <label>郵便番号</label>
+        <input
+          type="text"
+          name="postal_code"
+          value="{{ old('postal_code') }}"
+          inputmode="numeric"
+          pattern="[0-9]{7}"
+          maxlength="7"
+          placeholder="例：5420076"
+          autocomplete="postal-code"
+        >
+        @error('postal_code')
+          <div class="error">郵便番号はハイフンなし7桁の数字で入力してください</div>
+        @enderror
       </div>
 
       <button type="submit" class="btn" id="submitBtn">登録する</button>

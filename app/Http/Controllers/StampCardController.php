@@ -194,6 +194,7 @@ class StampCardController extends Controller
         $validated = $req->validate([
             'visit_frequency' => 'required|in:new,2_3,4plus',
             'gender' => 'required|in:male,female,other',
+            'postal_code' => 'nullable|digits:7',
             'birth_year' => 'nullable|integer|min:1920|max:' . date('Y'),
             'birth_month' => 'nullable|integer|min:1|max:12',
         ]);
@@ -201,6 +202,7 @@ class StampCardController extends Controller
         DB::table('users')->where('id', $user->id)->update([
             'visit_frequency' => $validated['visit_frequency'],
             'gender' => $validated['gender'],
+            'postal_code' => $validated['postal_code'] ?? null,
             'birth_year' => $validated['birth_year'] ?? null,
             'birth_month' => $validated['birth_month'] ?? null,
             'updated_at' => now(),

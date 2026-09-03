@@ -60,9 +60,7 @@ class RichMenu extends Model
                     'label' => mb_substr($area->label, 0, 20), // LINE仕様: 最大20文字
                     // LIFF URLはリダイレクトを挟むと、LINE内ブラウザ→ミニアプリの二重起動になりやすい。
                     // そのためLIFFは直リンク、それ以外はクリック計測リダイレクト経由にする。
-                    'uri'   => $this->shouldBypassClickRedirect($area->action_data)
-                        ? $area->action_data
-                        : url("/rm/click/{$area->id}"),
+                    'uri'   => $this->buildUriActionUrl($area),
                 ],
                 'message' => [
                     'type' => 'message',
@@ -106,5 +104,40 @@ class RichMenu extends Model
         }
 
         return str_starts_with($uri, 'line://app/');
+    }
+
+    private function buildUriActionUrl(RichMenuArea $area): ?string
+    {
+        $uri = $this->shouldBypassClickRedirect($area->action_data)
+            ? $area->action_data
+            : url("/rm/click/{$area->id}");
+
+        if (!$area->open_external_browser || !$this->canOpenExternalBrowser($uri)) {
+            return $uri;
+        }
+
+        return $this->appendOpenExternalBrowserParameter($uri);
+    }
+
+    private function canOpenExternalBrowser(?string $uri): bool
+    {
+        if (!$uri || !preg_match('/^https?:\/\//', $uri)) {
+            return false;
+        }
+
+        $liffId = (string) config('services.line.liff_id', '');
+
+        return $liffId === '' || !str_starts_with($uri, "https://liff.line.me/{$liffId}");
+    }
+
+    private function appendOpenExternalBrowserParameter(string $uri): string
+    {
+        if (preg_match('/(?:\?|&)openExternalBrowser=1(?:&|$)/', $uri)) {
+            return $uri;
+        }
+
+        $separator = str_contains($uri, '?') ? '&' : '?';
+
+        return "{$uri}{$separator}openExternalBrowser=1";
     }
 }
