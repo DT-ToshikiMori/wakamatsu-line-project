@@ -290,20 +290,57 @@
   });
 
   // Form submit with LIFF auth header
-  document.getElementById('registerForm').addEventListener('submit', function(e) {
+  document.getElementById('registerForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+
     const visitFreqChecked = document.querySelector('input[name="visit_frequency"]:checked');
     if (!visitFreqChecked) {
-      e.preventDefault();
       alert('来店回数を選択してください');
       return;
     }
     const genderChecked = document.querySelector('input[name="gender"]:checked');
     if (!genderChecked) {
-      e.preventDefault();
       alert('性別を選択してください');
       return;
     }
-    document.getElementById('submitBtn').disabled = true;
+
+    const submitBtn = document.getElementById('submitBtn');
+    submitBtn.disabled = true;
+
+    try {
+      const formData = new FormData(this);
+      const headers = window.liffHeaders ? window.liffHeaders() : {
+        'Accept': 'application/json',
+        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+      };
+      delete headers['Content-Type'];
+
+      const response = await fetch(this.action, {
+        method: 'POST',
+        headers,
+        body: formData,
+        credentials: 'same-origin'
+      });
+
+      if (response.status === 422) {
+        alert('入力内容を確認してください');
+        submitBtn.disabled = false;
+        return;
+      }
+
+      if (!response.ok) {
+        alert('登録に失敗しました。画面を再読み込みしてもう一度お試しください。');
+        submitBtn.disabled = false;
+        return;
+      }
+
+      const result = await response.json();
+      window.location.href = result.redirect_url || '/card';
+    } catch (error) {
+      console.warn('register submit failed:', error);
+      alert('登録に失敗しました。通信環境を確認してもう一度お試しください。');
+      submitBtn.disabled = false;
+    }
   });
 </script>
 </body>

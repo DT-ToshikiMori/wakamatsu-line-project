@@ -208,7 +208,16 @@ class StampCardController extends Controller
             'updated_at' => now(),
         ]);
 
-        return redirect($this->cardUrl($req->integer('qr_link_id') ?: null));
+        $redirectUrl = $this->cardUrl($req->integer('qr_link_id') ?: null);
+
+        if ($req->expectsJson()) {
+            return response()->json([
+                'ok' => true,
+                'redirect_url' => $redirectUrl,
+            ]);
+        }
+
+        return redirect($redirectUrl);
     }
 
     public function checkin(Request $req, ?int $store = null)

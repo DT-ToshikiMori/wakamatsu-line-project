@@ -16,6 +16,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->validateCsrfTokens(except: [
             'webhook/line',
             'api/liff/init',
+            'register',
+            's/*/register',
         ]);
 
         $middleware->alias([
