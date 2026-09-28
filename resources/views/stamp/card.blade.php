@@ -255,6 +255,48 @@
       background: color-mix(in srgb, var(--theme-accent, #ffd54a) 22%, rgba(255,255,255,.10));
       border: 1px solid color-mix(in srgb, var(--theme-accent, #ffd54a) 35%, rgba(255,255,255,.12));
     }
+    .noticeModal{
+      position:fixed;
+      inset:0;
+      z-index:10000;
+      display:none;
+      align-items:center;
+      justify-content:center;
+      padding:20px;
+      background:rgba(0,0,0,.62);
+    }
+    .noticeModal.on{display:flex}
+    .noticeDialog{
+      width:min(360px, 100%);
+      border-radius:18px;
+      border:1px solid rgba(255,255,255,.16);
+      background:#15151a;
+      box-shadow:0 24px 80px rgba(0,0,0,.45);
+      padding:20px;
+      text-align:center;
+    }
+    .noticeTitle{
+      font-size:18px;
+      font-weight:900;
+      letter-spacing:.04em;
+    }
+    .noticeText{
+      margin-top:10px;
+      color:rgba(255,255,255,.76);
+      font-size:14px;
+      line-height:1.6;
+    }
+    .noticeBtn{
+      width:100%;
+      margin-top:18px;
+      padding:13px 14px;
+      border-radius:14px;
+      border:0;
+      background:var(--theme-accent, #f5c451);
+      color:#0b0b0f;
+      font-weight:900;
+      cursor:pointer;
+    }
 
   </style>
 </head>
@@ -325,6 +367,14 @@
   </div>
 </div>
 
+<div class="noticeModal" id="alreadyStampedModal" role="dialog" aria-modal="true" aria-labelledby="alreadyStampedTitle">
+  <div class="noticeDialog">
+    <div class="noticeTitle" id="alreadyStampedTitle">本日のスタンプはすでに獲得済みです</div>
+    <div class="noticeText">次のスタンプは、前回の獲得から24時間後に押せます。</div>
+    <button type="button" class="noticeBtn" id="alreadyStampedClose">OK</button>
+  </div>
+</div>
+
 
 @include('partials.lottery-slot')
 @include('partials.tab-bar', ['tabStoreId' => (int)$store->id, 'tabActive' => 'card'])
@@ -332,6 +382,7 @@
 <script>
   const storeId = {{ (int)$store->id }};
   const qrLinkId = @json($qrLinkId ?? null);
+  const alreadyStampedOnLoad = @json($alreadyStamped ?? false);
   const goal = {{ (int)$goal }};
   const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 
@@ -344,6 +395,27 @@
   const visitBig = document.getElementById('visitBig');
   const lastVisit = document.getElementById('lastVisit');
   const nextText = document.getElementById('nextText');
+  const alreadyStampedModal = document.getElementById('alreadyStampedModal');
+  const alreadyStampedClose = document.getElementById('alreadyStampedClose');
+
+  function showAlreadyStampedModal(){
+    if (alreadyStampedModal) alreadyStampedModal.classList.add('on');
+  }
+  function hideAlreadyStampedModal(){
+    if (alreadyStampedModal) alreadyStampedModal.classList.remove('on');
+  }
+  if (alreadyStampedClose) {
+    alreadyStampedClose.addEventListener('click', hideAlreadyStampedModal);
+  }
+  if (alreadyStampedModal) {
+    alreadyStampedModal.addEventListener('click', (event) => {
+      if (event.target === alreadyStampedModal) hideAlreadyStampedModal();
+    });
+  }
+  if (alreadyStampedOnLoad) {
+    window.addEventListener('load', showAlreadyStampedModal);
+  }
+
   function computeStateFromResponse(data){
     const cardProgress = (data.card_progress !== undefined && data.card_progress !== null)
       ? parseInt(data.card_progress, 10)
@@ -389,6 +461,10 @@
       });
 
       const data = await res.json();
+      if (res.status === 409 && data.error === 'already_stamped') {
+        showAlreadyStampedModal();
+        return;
+      }
       if(!data.ok) throw new Error('checkin failed');
 
       const next = computeStateFromResponse(data);

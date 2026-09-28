@@ -71,17 +71,24 @@ class StampCardController extends Controller
         }
 
         // QRスキャン自動チェックイン
-        // qr_link_id があり、stamped=1 でなければ実行。同じQRの連続読み込みも来店として扱う。
+        // qr_link_id があり、stamped=1 でなければ実行。24時間以内の再付与はモーダル表示に回す。
         $qrLinkId = $req->integer('qr_link_id');
         if ($qrLinkId && !$req->boolean('stamped')) {
-            $this->performCheckin($storeId, $user, $lineUserId, $qrLinkId);
+            $result = $this->performCheckin($storeId, $user, $lineUserId, $qrLinkId);
 
             // stamped=1 を付けてリダイレクト（重複実行防止）。表示店舗維持のためQR情報も引き継ぐ。
-            return redirect('/card?' . http_build_query([
+            $params = [
                 'qr_link_id' => $qrLinkId,
-                'ok' => 1,
                 'stamped' => 1,
-            ]));
+            ];
+
+            if ($result['alreadyStamped']) {
+                $params['already_stamped'] = 1;
+            } else {
+                $params['ok'] = 1;
+            }
+
+            return redirect('/card?' . http_build_query($params));
         }
 
         // ① ランク定義（グローバル、priority順）
@@ -137,6 +144,7 @@ class StampCardController extends Controller
         }
 
         $flash = $req->query('ok');
+        $alreadyStamped = $req->boolean('already_stamped');
 
         return view('stamp.card', [
             'store' => $storeRow,
@@ -149,6 +157,7 @@ class StampCardController extends Controller
             'nextReward' => $nextReward,
             'remaining' => $remaining,
             'flash' => $flash,
+            'alreadyStamped' => $alreadyStamped,
 
             'cards' => $cards,
             'currentCard' => $currentCard,
@@ -236,6 +245,19 @@ class StampCardController extends Controller
         $result = $this->performCheckin($storeId, $user, $lineUserId, $qrLinkId ? (int)$qrLinkId : null);
 
         if ($req->expectsJson()) {
+            if ($result['alreadyStamped']) {
+                return response()->json([
+                    'ok' => false,
+                    'error' => 'already_stamped',
+                    'message' => '本日のスタンプはすでに獲得済みです。',
+                    'stamp_total' => (int) $result['newUser']->stamp_total,
+                    'card_progress' => (int) $result['newUser']->card_progress,
+                    'current_card_id' => $result['newUser']->current_card_id,
+                    'visit_count' => (int) $result['newUser']->visit_count,
+                    'last_visit_at' => (string) $result['newUser']->last_visit_at,
+                ], 409);
+            }
+
             $response = [
                 'ok'              => true,
                 'stamp_total'     => (int) $result['newUser']->stamp_total,
@@ -270,12 +292,27 @@ class StampCardController extends Controller
         }
 
         $visitedAt = now();
+        $threshold = $visitedAt->copy()->subHours(24);
         $requestId = 'qr_' . bin2hex(random_bytes(8));
 
         $lotteryResult = null;
         $currentCardBeforeUpgrade = null;
+        $alreadyStamped = false;
+        $newUser = null;
 
-        DB::transaction(function () use ($store, $user, $visitedAt, $requestId, $stampCount, $qrLinkId, &$currentCardBeforeUpgrade) {
+        DB::transaction(function () use ($store, $user, $visitedAt, $threshold, $requestId, $stampCount, $qrLinkId, &$currentCardBeforeUpgrade, &$alreadyStamped, &$newUser) {
+            $lockedUser = DB::table('users')
+                ->where('id', $user->id)
+                ->lockForUpdate()
+                ->first();
+
+            if ($lockedUser && $lockedUser->last_visit_at && $lockedUser->last_visit_at >= $threshold->format('Y-m-d H:i:s')) {
+                $alreadyStamped = true;
+                $newUser = $lockedUser;
+                return;
+            }
+
+            $user = $lockedUser ?: $user;
 
             // ① visit log（店舗スコープ維持）
             DB::table('visits')->insert([
@@ -344,10 +381,20 @@ class StampCardController extends Controller
                 'visit_count' => DB::raw('visit_count + 1'),
                 'updated_at' => now(),
             ]);
+
+            $newUser = DB::table('users')->where('id', $user->id)->first();
         });
 
         // ⑥ 再取得
-        $newUser = DB::table('users')->where('id', $user->id)->first();
+        $newUser = $newUser ?: DB::table('users')->where('id', $user->id)->first();
+
+        if ($alreadyStamped) {
+            return [
+                'newUser' => $newUser,
+                'lotteryResult' => null,
+                'alreadyStamped' => true,
+            ];
+        }
 
         try {
             if (!app(RichMenuService::class)->syncForUser($newUser)) {
@@ -465,6 +512,7 @@ class StampCardController extends Controller
         return [
             'newUser'       => $newUser,
             'lotteryResult' => $lotteryResult,
+            'alreadyStamped' => false,
         ];
     }
 
