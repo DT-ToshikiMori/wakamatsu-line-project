@@ -207,10 +207,10 @@
                                         circle.addListener('click', () => {
                                             infoWindow.setPosition(position);
                                             infoWindow.setContent(`
-                                                <div style="font-size:13px; line-height:1.7;">
-                                                    <strong>${row.postal_code}</strong><br>
-                                                    ${row.count.toLocaleString()}人 / ${row.percent}%<br>
-                                                    ${row.address || ''}
+                                                <div style="font-size:13px; line-height:1.7; color:#111827; min-width:150px;">
+                                                    <strong style="color:#111827;">〒${row.postal_code}</strong><br>
+                                                    <span style="color:#111827;">${Number(row.count || 0).toLocaleString()}人 / ${row.percent}%</span><br>
+                                                    <span style="color:#4b5563;">${row.address || ''}</span>
                                                 </div>
                                             `);
                                             infoWindow.open(map);
