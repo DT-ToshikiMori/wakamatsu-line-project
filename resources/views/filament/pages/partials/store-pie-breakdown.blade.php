@@ -6,32 +6,49 @@
     $values = $rows->pluck('count')->map(fn ($count) => (int) $count)->values()->toArray();
 @endphp
 
-<div class="grid grid-cols-1 md:grid-cols-[240px_1fr] gap-6 items-center" wire:loading.class="opacity-50">
-    <div class="flex justify-center">
+<div
+    class="store-pie-breakdown"
+    wire:loading.class="opacity-50"
+    style="display:grid; grid-template-columns:240px minmax(0, 1fr); gap:28px; align-items:center;"
+>
+    <div style="display:flex; justify-content:flex-start;">
         <div style="width:220px; height:220px;">
-            <canvas id="{{ $chartId }}" width="220" height="220"></canvas>
+            <canvas id="{{ $chartId }}" width="220" height="220" style="display:block; width:220px; height:220px;"></canvas>
         </div>
     </div>
 
-    <div class="space-y-3">
+    <div style="display:flex; flex-direction:column; gap:12px; min-width:0;">
         @forelse($rows as $index => $row)
-            <div class="flex items-center justify-between gap-4 text-sm">
-                <div class="flex items-center gap-2 min-w-0">
+            <div style="display:grid; grid-template-columns:minmax(0, 1fr) auto; gap:16px; align-items:center; font-size:14px;">
+                <div style="display:flex; align-items:center; gap:8px; min-width:0;">
                     <span
-                        class="h-3 w-3 shrink-0 rounded-sm"
-                        style="background: {{ $colors[$index % count($colors)] ?? '#6b7280' }};"
+                        style="width:12px; height:12px; flex:0 0 12px; border-radius:2px; background: {{ $colors[$index % count($colors)] ?? '#6b7280' }};"
                     ></span>
-                    <span class="font-medium text-gray-950 dark:text-white truncate">{{ $row['label'] }}</span>
+                    <span class="font-medium text-gray-950 dark:text-white" style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ $row['label'] }}</span>
                 </div>
-                <span class="shrink-0 tabular-nums text-gray-600 dark:text-gray-300">
+                <span class="tabular-nums text-gray-600 dark:text-gray-300" style="white-space:nowrap;">
                     {{ number_format($row['count']) }}人 / {{ $row['percent'] }}%
                 </span>
             </div>
         @empty
-            <div class="py-8 text-center text-sm text-gray-500">データがありません</div>
+            <div class="py-8 text-sm text-gray-500">データがありません</div>
         @endforelse
     </div>
 </div>
+
+@once
+    <style>
+        @media (max-width: 640px) {
+            .store-pie-breakdown {
+                grid-template-columns: 1fr !important;
+            }
+
+            .store-pie-breakdown > div:first-child {
+                justify-content: center !important;
+            }
+        }
+    </style>
+@endonce
 
 <script>
 (() => {
