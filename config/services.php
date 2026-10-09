@@ -43,4 +43,8 @@ return [
         'bot_channel_access_token' => env('LINE_BOT_CHANNEL_ACCESS_TOKEN'),
     ],
 
+    'google_maps' => [
+        'key' => env('GOOGLE_MAPS_API_KEY'),
+    ],
+
 ];

@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use App\Models\Store;
+use App\Services\PostalCodeGeocodeService;
 use Filament\Pages\Page;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -27,6 +28,8 @@ class StoreDashboard extends Page
     public array $ageRows = [];
     public array $frequencyRows = [];
     public array $postalRows = [];
+    public array $mapRows = [];
+    public ?string $googleMapsApiKey = null;
 
     public function mount(): void
     {
@@ -72,6 +75,8 @@ class StoreDashboard extends Page
         $this->ageRows = $this->buildAgeRows($visitorUserIds);
         $this->frequencyRows = $this->buildFrequencyRows($visitorUserIds);
         $this->postalRows = $this->buildPostalRows($visitorUserIds);
+        $this->googleMapsApiKey = app(PostalCodeGeocodeService::class)->getApiKey();
+        $this->mapRows = $this->buildMapRows($this->postalRows);
     }
 
     protected function period(): array
@@ -311,6 +316,42 @@ class StoreDashboard extends Page
                 'count' => (int) $row->count,
                 'percent' => $total > 0 ? round(((int) $row->count / $total) * 100, 1) : 0,
             ])
+            ->toArray();
+    }
+
+    protected function buildMapRows(array $postalRows): array
+    {
+        if (empty($postalRows)) {
+            return [];
+        }
+
+        $geocoder = app(PostalCodeGeocodeService::class);
+        $maxCount = max(array_column($postalRows, 'count')) ?: 1;
+
+        return collect($postalRows)
+            ->map(function (array $row) use ($geocoder, $maxCount) {
+                $geocode = $geocoder->geocode($row['label']);
+
+                if (! $geocode || $geocode->latitude === null || $geocode->longitude === null) {
+                    return null;
+                }
+
+                $count = (int) $row['count'];
+                $weight = $count / $maxCount;
+
+                return [
+                    'postal_code' => $row['label'],
+                    'count' => $count,
+                    'percent' => $row['percent'],
+                    'lat' => $geocode->latitude,
+                    'lng' => $geocode->longitude,
+                    'address' => $geocode->formatted_address,
+                    'radius' => (int) round(350 + (1850 * sqrt($weight))),
+                    'opacity' => round(0.2 + (0.35 * $weight), 2),
+                ];
+            })
+            ->filter()
+            ->values()
             ->toArray();
     }
 

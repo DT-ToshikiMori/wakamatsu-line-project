@@ -110,6 +110,139 @@
         </x-filament::section>
 
         <x-filament::section>
+            <x-slot name="heading">郵便番号エリアマップ</x-slot>
+            @if(empty($googleMapsApiKey))
+                <div class="py-8 text-center text-sm text-gray-500">Google Maps APIキーが未設定です</div>
+            @elseif(empty($mapRows))
+                <div class="py-8 text-center text-sm text-gray-500">地図に表示できる郵便番号データがありません</div>
+            @else
+                <div
+                    id="store-postal-map"
+                    data-api-key="{{ $googleMapsApiKey }}"
+                    data-map-rows='@json($mapRows)'
+                    style="height:420px; border-radius:8px; overflow:hidden; background:#111827;"
+                ></div>
+
+                @once
+                    <script>
+                    (() => {
+                        if (window.wakamatsuStorePostalMapInitialized) {
+                            return;
+                        }
+
+                        window.wakamatsuStorePostalMapInitialized = true;
+
+                        window.wakamatsuLoadGoogleMaps = (apiKey) => {
+                            if (window.google?.maps) {
+                                return Promise.resolve();
+                            }
+
+                            window.wakamatsuGoogleMapsPromise = window.wakamatsuGoogleMapsPromise || new Promise((resolve, reject) => {
+                                window.wakamatsuGoogleMapsLoaded = resolve;
+
+                                const existing = document.querySelector('script[data-wakamatsu-google-maps]');
+                                if (existing) {
+                                    existing.addEventListener('error', reject, { once: true });
+                                    return;
+                                }
+
+                                const script = document.createElement('script');
+                                script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&callback=wakamatsuGoogleMapsLoaded`;
+                                script.async = true;
+                                script.defer = true;
+                                script.dataset.wakamatsuGoogleMaps = 'true';
+                                script.onerror = reject;
+                                document.head.appendChild(script);
+                            });
+
+                            return window.wakamatsuGoogleMapsPromise;
+                        };
+
+                        const parseRows = (element) => {
+                            try {
+                                return JSON.parse(element.dataset.mapRows || '[]');
+                            } catch (error) {
+                                return [];
+                            }
+                        };
+
+                        window.wakamatsuRenderStorePostalMap = () => {
+                            const element = document.getElementById('store-postal-map');
+                            if (!element) {
+                                return;
+                            }
+
+                            const rows = parseRows(element);
+                            if (rows.length === 0) {
+                                return;
+                            }
+
+                            window.wakamatsuLoadGoogleMaps(element.dataset.apiKey)
+                                .then(() => {
+                                    const bounds = new google.maps.LatLngBounds();
+                                    const map = new google.maps.Map(element, {
+                                        center: { lat: rows[0].lat, lng: rows[0].lng },
+                                        zoom: 12,
+                                        mapTypeControl: false,
+                                        streetViewControl: false,
+                                        fullscreenControl: true,
+                                    });
+                                    const infoWindow = new google.maps.InfoWindow();
+
+                                    rows.forEach((row) => {
+                                        const position = { lat: Number(row.lat), lng: Number(row.lng) };
+                                        bounds.extend(position);
+
+                                        const circle = new google.maps.Circle({
+                                            strokeColor: '#f97316',
+                                            strokeOpacity: 0.85,
+                                            strokeWeight: 1,
+                                            fillColor: '#f97316',
+                                            fillOpacity: Number(row.opacity || 0.35),
+                                            map,
+                                            center: position,
+                                            radius: Number(row.radius || 600),
+                                        });
+
+                                        circle.addListener('click', () => {
+                                            infoWindow.setPosition(position);
+                                            infoWindow.setContent(`
+                                                <div style="font-size:13px; line-height:1.7;">
+                                                    <strong>${row.postal_code}</strong><br>
+                                                    ${row.count.toLocaleString()}人 / ${row.percent}%<br>
+                                                    ${row.address || ''}
+                                                </div>
+                                            `);
+                                            infoWindow.open(map);
+                                        });
+                                    });
+
+                                    if (rows.length > 1) {
+                                        map.fitBounds(bounds, 48);
+                                    }
+                                })
+                                .catch(() => {});
+                        };
+
+                        document.addEventListener('DOMContentLoaded', window.wakamatsuRenderStorePostalMap);
+                        document.addEventListener('livewire:navigated', window.wakamatsuRenderStorePostalMap);
+                        document.addEventListener('livewire:init', () => {
+                            if (!window.Livewire) {
+                                return;
+                            }
+
+                            window.Livewire.hook('morph.updated', () => {
+                                window.wakamatsuRenderStorePostalMap();
+                            });
+                        });
+                        window.wakamatsuRenderStorePostalMap();
+                    })();
+                    </script>
+                @endonce
+            @endif
+        </x-filament::section>
+
+        <x-filament::section>
             <x-slot name="heading">郵便番号 上位20件</x-slot>
             <div class="space-y-3" wire:loading.class="opacity-50">
                 @forelse($postalRows as $row)
