@@ -13,7 +13,16 @@
 >
     <div style="display:flex; justify-content:flex-start;">
         <div style="width:220px; height:220px;">
-            <canvas id="{{ $chartId }}" width="220" height="220" style="display:block; width:220px; height:220px;"></canvas>
+            <canvas
+                id="{{ $chartId }}"
+                class="js-store-pie-chart"
+                width="220"
+                height="220"
+                data-labels='@json($labels)'
+                data-values='@json($values)'
+                data-colors='@json($colors)'
+                style="display:block; width:220px; height:220px;"
+            ></canvas>
         </div>
     </div>
 
@@ -50,95 +59,134 @@
     </style>
 @endonce
 
-<script>
-(() => {
-    const chartId = @js($chartId);
-    const labels = @js($labels);
-    const values = @js($values);
-    const colors = @js($colors);
-
-    window.wakamatsuLoadChartJs = window.wakamatsuLoadChartJs || (() => {
-        let promise = null;
-
-        return () => {
-            if (window.Chart) {
-                return Promise.resolve();
-            }
-
-            if (promise) {
-                return promise;
-            }
-
-            promise = new Promise((resolve, reject) => {
-                const existing = document.querySelector('script[data-wakamatsu-chartjs]');
-
-                if (existing) {
-                    existing.addEventListener('load', resolve, { once: true });
-                    existing.addEventListener('error', reject, { once: true });
-                    return;
-                }
-
-                const script = document.createElement('script');
-                script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js';
-                script.dataset.wakamatsuChartjs = 'true';
-                script.onload = resolve;
-                script.onerror = reject;
-                document.head.appendChild(script);
-            });
-
-            return promise;
-        };
-    })();
-
-    const render = () => {
-        const canvas = document.getElementById(chartId);
-
-        if (!canvas || !window.Chart) {
+@once
+    <script>
+    (() => {
+        if (window.wakamatsuStorePieRendererInitialized) {
             return;
         }
 
-        const total = values.reduce((sum, value) => sum + Number(value || 0), 0);
-
-        if (canvas.dataset.chartInstanceId && window.wakamatsuStorePieCharts?.[canvas.dataset.chartInstanceId]) {
-            window.wakamatsuStorePieCharts[canvas.dataset.chartInstanceId].destroy();
-        }
-
+        window.wakamatsuStorePieRendererInitialized = true;
         window.wakamatsuStorePieCharts = window.wakamatsuStorePieCharts || {};
-        const instanceId = chartId + '-' + Date.now();
-        canvas.dataset.chartInstanceId = instanceId;
 
-        window.wakamatsuStorePieCharts[instanceId] = new Chart(canvas, {
-            type: 'pie',
-            data: {
-                labels,
-                datasets: [{
-                    data: values,
-                    backgroundColor: colors,
-                    borderColor: 'rgba(255,255,255,.1)',
-                    borderWidth: 1,
-                }],
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                        callbacks: {
-                            label(context) {
-                                const value = Number(context.raw || 0);
-                                const percent = total > 0 ? Math.round((value / total) * 1000) / 10 : 0;
-                                return ` ${context.label}: ${value.toLocaleString()}人 / ${percent}%`;
+        window.wakamatsuLoadChartJs = window.wakamatsuLoadChartJs || (() => {
+            let promise = null;
+
+            return () => {
+                if (window.Chart) {
+                    return Promise.resolve();
+                }
+
+                if (promise) {
+                    return promise;
+                }
+
+                promise = new Promise((resolve, reject) => {
+                    const existing = document.querySelector('script[data-wakamatsu-chartjs]');
+
+                    if (existing) {
+                        existing.addEventListener('load', resolve, { once: true });
+                        existing.addEventListener('error', reject, { once: true });
+                        return;
+                    }
+
+                    const script = document.createElement('script');
+                    script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js';
+                    script.dataset.wakamatsuChartjs = 'true';
+                    script.onload = resolve;
+                    script.onerror = reject;
+                    document.head.appendChild(script);
+                });
+
+                return promise;
+            };
+        })();
+
+        const parseJson = (value, fallback) => {
+            try {
+                return JSON.parse(value || '');
+            } catch (error) {
+                return fallback;
+            }
+        };
+
+        const renderCanvas = (canvas) => {
+            if (!canvas || !window.Chart) {
+                return;
+            }
+
+            const labels = parseJson(canvas.dataset.labels, []);
+            const values = parseJson(canvas.dataset.values, []);
+            const colors = parseJson(canvas.dataset.colors, []);
+            const dataHash = JSON.stringify({ labels, values, colors });
+
+            if (canvas.dataset.renderedHash === dataHash && canvas.dataset.chartInstanceId) {
+                return;
+            }
+
+            if (canvas.dataset.chartInstanceId && window.wakamatsuStorePieCharts[canvas.dataset.chartInstanceId]) {
+                window.wakamatsuStorePieCharts[canvas.dataset.chartInstanceId].destroy();
+                delete window.wakamatsuStorePieCharts[canvas.dataset.chartInstanceId];
+            }
+
+            const total = values.reduce((sum, value) => sum + Number(value || 0), 0);
+            const instanceId = canvas.id + '-' + Date.now();
+            canvas.dataset.chartInstanceId = instanceId;
+            canvas.dataset.renderedHash = dataHash;
+
+            window.wakamatsuStorePieCharts[instanceId] = new Chart(canvas, {
+                type: 'pie',
+                data: {
+                    labels,
+                    datasets: [{
+                        data: values,
+                        backgroundColor: colors,
+                        borderColor: 'rgba(255,255,255,.1)',
+                        borderWidth: 1,
+                    }],
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label(context) {
+                                    const value = Number(context.raw || 0);
+                                    const percent = total > 0 ? Math.round((value / total) * 1000) / 10 : 0;
+                                    return ` ${context.label}: ${value.toLocaleString()}人 / ${percent}%`;
+                                },
                             },
                         },
                     },
                 },
-            },
-        });
-    };
+            });
+        };
 
-    window.wakamatsuLoadChartJs()
-        .then(() => requestAnimationFrame(render))
-        .catch(() => {});
-})();
-</script>
+        window.wakamatsuRenderStorePieCharts = () => {
+            window.wakamatsuLoadChartJs()
+                .then(() => requestAnimationFrame(() => {
+                    document.querySelectorAll('canvas.js-store-pie-chart').forEach(renderCanvas);
+                }))
+                .catch(() => {});
+        };
+
+        document.addEventListener('DOMContentLoaded', window.wakamatsuRenderStorePieCharts);
+        document.addEventListener('livewire:navigated', window.wakamatsuRenderStorePieCharts);
+
+        document.addEventListener('livewire:init', () => {
+            if (!window.Livewire) {
+                return;
+            }
+
+            window.Livewire.hook('morph.updated', () => {
+                window.wakamatsuRenderStorePieCharts();
+            });
+        });
+
+        window.wakamatsuRenderStorePieCharts();
+    })();
+    </script>
+@endonce
