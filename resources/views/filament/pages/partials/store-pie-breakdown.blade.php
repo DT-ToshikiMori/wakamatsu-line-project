@@ -1,49 +1,16 @@
 @php
     $rows = collect($rows);
     $colors = $colors ?? ['#3b82f6', '#ec4899', '#f59e0b', '#6b7280'];
-    $total = (int) $rows->sum('count');
-    $radius = 42;
-    $circumference = 2 * pi() * $radius;
-    $offset = 25;
-    $segments = [];
-
-    foreach ($rows->values() as $index => $row) {
-        $count = (int) ($row['count'] ?? 0);
-
-        if ($total <= 0 || $count <= 0) {
-            continue;
-        }
-
-        $length = ($count / $total) * $circumference;
-        $segments[] = [
-            'color' => $colors[$index % count($colors)] ?? '#6b7280',
-            'dasharray' => round($length, 4) . ' ' . round($circumference - $length, 4),
-            'dashoffset' => round(-$offset, 4),
-        ];
-        $offset += $length;
-    }
+    $chartId = 'store-pie-' . md5(json_encode($rows->values()->toArray()) . json_encode($colors) . uniqid('', true));
+    $labels = $rows->pluck('label')->values()->toArray();
+    $values = $rows->pluck('count')->map(fn ($count) => (int) $count)->values()->toArray();
 @endphp
 
-<div class="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-6 items-center" wire:loading.class="opacity-50">
+<div class="grid grid-cols-1 md:grid-cols-[240px_1fr] gap-6 items-center" wire:loading.class="opacity-50">
     <div class="flex justify-center">
-        <svg width="192" height="192" viewBox="0 0 100 100" role="img" aria-label="構成比グラフ">
-            <circle cx="50" cy="50" r="{{ $radius }}" fill="none" stroke="#374151" stroke-width="16" />
-
-            @foreach($segments as $segment)
-                <circle
-                    cx="50"
-                    cy="50"
-                    r="{{ $radius }}"
-                    fill="none"
-                    stroke="{{ $segment['color'] }}"
-                    stroke-width="16"
-                    stroke-dasharray="{{ $segment['dasharray'] }}"
-                    stroke-dashoffset="{{ $segment['dashoffset'] }}"
-                    stroke-linecap="butt"
-                    transform="rotate(-90 50 50)"
-                />
-            @endforeach
-        </svg>
+        <div style="width:220px; height:220px;">
+            <canvas id="{{ $chartId }}" width="220" height="220"></canvas>
+        </div>
     </div>
 
     <div class="space-y-3">
@@ -65,3 +32,96 @@
         @endforelse
     </div>
 </div>
+
+<script>
+(() => {
+    const chartId = @js($chartId);
+    const labels = @js($labels);
+    const values = @js($values);
+    const colors = @js($colors);
+
+    window.wakamatsuLoadChartJs = window.wakamatsuLoadChartJs || (() => {
+        let promise = null;
+
+        return () => {
+            if (window.Chart) {
+                return Promise.resolve();
+            }
+
+            if (promise) {
+                return promise;
+            }
+
+            promise = new Promise((resolve, reject) => {
+                const existing = document.querySelector('script[data-wakamatsu-chartjs]');
+
+                if (existing) {
+                    existing.addEventListener('load', resolve, { once: true });
+                    existing.addEventListener('error', reject, { once: true });
+                    return;
+                }
+
+                const script = document.createElement('script');
+                script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js';
+                script.dataset.wakamatsuChartjs = 'true';
+                script.onload = resolve;
+                script.onerror = reject;
+                document.head.appendChild(script);
+            });
+
+            return promise;
+        };
+    })();
+
+    const render = () => {
+        const canvas = document.getElementById(chartId);
+
+        if (!canvas || !window.Chart) {
+            return;
+        }
+
+        const total = values.reduce((sum, value) => sum + Number(value || 0), 0);
+
+        if (canvas.dataset.chartInstanceId && window.wakamatsuStorePieCharts?.[canvas.dataset.chartInstanceId]) {
+            window.wakamatsuStorePieCharts[canvas.dataset.chartInstanceId].destroy();
+        }
+
+        window.wakamatsuStorePieCharts = window.wakamatsuStorePieCharts || {};
+        const instanceId = chartId + '-' + Date.now();
+        canvas.dataset.chartInstanceId = instanceId;
+
+        window.wakamatsuStorePieCharts[instanceId] = new Chart(canvas, {
+            type: 'pie',
+            data: {
+                labels,
+                datasets: [{
+                    data: values,
+                    backgroundColor: colors,
+                    borderColor: 'rgba(255,255,255,.1)',
+                    borderWidth: 1,
+                }],
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label(context) {
+                                const value = Number(context.raw || 0);
+                                const percent = total > 0 ? Math.round((value / total) * 1000) / 10 : 0;
+                                return ` ${context.label}: ${value.toLocaleString()}人 / ${percent}%`;
+                            },
+                        },
+                    },
+                },
+            },
+        });
+    };
+
+    window.wakamatsuLoadChartJs()
+        .then(() => requestAnimationFrame(render))
+        .catch(() => {});
+})();
+</script>
