@@ -84,107 +84,29 @@
         </x-filament::section>
     @endif
 
-    <div
-        wire:key="store-dashboard-charts-{{ $storeId ?: 'all' }}-{{ $startDate }}-{{ $endDate }}"
-        x-data="{
-            charts: [],
-            genderData: {
-                labels: @js(collect($genderRows)->pluck('label')->toArray()),
-                values: @js(collect($genderRows)->pluck('count')->toArray()),
-                colors: ['#3b82f6', '#ec4899', '#8b5cf6', '#6b7280'],
-            },
-            ageData: {
-                labels: @js(collect($ageRows)->pluck('label')->toArray()),
-                values: @js(collect($ageRows)->pluck('count')->toArray()),
-                colors: ['#38bdf8', '#22c55e', '#f59e0b', '#ef4444', '#a855f7', '#14b8a6', '#6b7280'],
-            },
-
-            loadChartJs() {
-                return new Promise((resolve) => {
-                    if (typeof window.Chart !== 'undefined') {
-                        resolve();
-                        return;
-                    }
-
-                    const script = document.createElement('script');
-                    script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js';
-                    script.onload = () => resolve();
-                    script.onerror = () => resolve();
-                    document.head.appendChild(script);
-                });
-            },
-
-            async initCharts() {
-                await this.loadChartJs();
-                if (typeof window.Chart === 'undefined') return;
-
-                this.$nextTick(() => {
-                    this.renderPie(this.$refs.genderChart, this.genderData);
-                    this.renderPie(this.$refs.ageChart, this.ageData);
-                });
-            },
-
-            renderPie(canvas, data) {
-                if (!canvas) return;
-
-                const total = data.values.reduce((sum, value) => sum + Number(value || 0), 0);
-
-                this.charts.push(new Chart(canvas, {
-                    type: 'pie',
-                    data: {
-                        labels: data.labels,
-                        datasets: [{
-                            data: data.values,
-                            backgroundColor: data.colors,
-                            borderColor: 'rgba(255,255,255,.08)',
-                            borderWidth: 1,
-                        }],
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: {
-                                position: 'bottom',
-                                labels: { color: '#9ca3af', font: { size: 12 }, boxWidth: 12 },
-                            },
-                            tooltip: {
-                                callbacks: {
-                                    label(context) {
-                                        const value = Number(context.raw || 0);
-                                        const percent = total > 0 ? Math.round((value / total) * 1000) / 10 : 0;
-                                        return ` ${context.label}: ${value.toLocaleString()}人 / ${percent}%`;
-                                    },
-                                },
-                            },
-                        },
-                    },
-                }));
-            },
-        }"
-        x-init="initCharts()"
-    >
-        <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
-            <x-filament::section>
-                <x-slot name="heading">性別</x-slot>
-                <div class="h-72" wire:loading.class="opacity-50">
-                    <canvas x-ref="genderChart"></canvas>
-                </div>
-            </x-filament::section>
-
-            <x-filament::section>
-                <x-slot name="heading">年代</x-slot>
-                <div class="h-72" wire:loading.class="opacity-50">
-                    <canvas x-ref="ageChart"></canvas>
-                </div>
-            </x-filament::section>
-        </div>
-    </div>
-
     <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
         <x-filament::section>
+            <x-slot name="heading">性別</x-slot>
+            @include('filament.pages.partials.store-pie-breakdown', [
+                'rows' => $genderRows,
+                'colors' => ['#3b82f6', '#ec4899', '#8b5cf6', '#6b7280'],
+            ])
+        </x-filament::section>
+
+        <x-filament::section>
+            <x-slot name="heading">年代</x-slot>
+            @include('filament.pages.partials.store-pie-breakdown', [
+                'rows' => $ageRows,
+                'colors' => ['#38bdf8', '#22c55e', '#f59e0b', '#ef4444', '#a855f7', '#14b8a6', '#6b7280'],
+            ])
+        </x-filament::section>
+
+        <x-filament::section>
             <x-slot name="heading">初回登録時の来店状況</x-slot>
-            @include('filament.pages.partials.store-breakdown', ['rows' => $frequencyRows])
+            @include('filament.pages.partials.store-pie-breakdown', [
+                'rows' => $frequencyRows,
+                'colors' => ['#22c55e', '#f59e0b', '#ef4444', '#6b7280'],
+            ])
         </x-filament::section>
 
         <x-filament::section>
