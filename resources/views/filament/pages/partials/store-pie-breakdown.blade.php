@@ -2,7 +2,9 @@
     $rows = collect($rows);
     $colors = $colors ?? ['#3b82f6', '#ec4899', '#f59e0b', '#6b7280'];
     $total = (int) $rows->sum('count');
-    $cursor = 0.0;
+    $radius = 42;
+    $circumference = 2 * pi() * $radius;
+    $offset = 25;
     $segments = [];
 
     foreach ($rows->values() as $index => $row) {
@@ -12,24 +14,36 @@
             continue;
         }
 
-        $start = $cursor;
-        $cursor += ($count / $total) * 100;
-        $segments[] = ($colors[$index % count($colors)] ?? '#6b7280') . ' ' . round($start, 2) . '% ' . round($cursor, 2) . '%';
+        $length = ($count / $total) * $circumference;
+        $segments[] = [
+            'color' => $colors[$index % count($colors)] ?? '#6b7280',
+            'dasharray' => round($length, 4) . ' ' . round($circumference - $length, 4),
+            'dashoffset' => round(-$offset, 4),
+        ];
+        $offset += $length;
     }
-
-    $pieBackground = count($segments) > 0
-        ? 'conic-gradient(' . implode(', ', $segments) . ')'
-        : 'linear-gradient(135deg, #374151, #1f2937)';
 @endphp
 
 <div class="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-6 items-center" wire:loading.class="opacity-50">
     <div class="flex justify-center">
-        <div
-            class="h-48 w-48 rounded-full border border-gray-200 dark:border-white/10 shadow-sm"
-            style="background: {{ $pieBackground }};"
-            role="img"
-            aria-label="構成比グラフ"
-        ></div>
+        <svg width="192" height="192" viewBox="0 0 100 100" role="img" aria-label="構成比グラフ">
+            <circle cx="50" cy="50" r="{{ $radius }}" fill="none" stroke="#374151" stroke-width="16" />
+
+            @foreach($segments as $segment)
+                <circle
+                    cx="50"
+                    cy="50"
+                    r="{{ $radius }}"
+                    fill="none"
+                    stroke="{{ $segment['color'] }}"
+                    stroke-width="16"
+                    stroke-dasharray="{{ $segment['dasharray'] }}"
+                    stroke-dashoffset="{{ $segment['dashoffset'] }}"
+                    stroke-linecap="butt"
+                    transform="rotate(-90 50 50)"
+                />
+            @endforeach
+        </svg>
     </div>
 
     <div class="space-y-3">
