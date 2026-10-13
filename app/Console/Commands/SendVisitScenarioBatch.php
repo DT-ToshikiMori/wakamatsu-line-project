@@ -81,13 +81,13 @@ class SendVisitScenarioBatch extends Command
             return;
         }
 
-        $lineUserIds = $users->values()->all();
-        $sentCount   = 0;
+        $lineUsersByUserId = $users->mapWithKeys(fn ($lineUserId, $userId) => [(int) $userId => $lineUserId]);
+        $sentUserIds       = [];
 
-        foreach (array_chunk($lineUserIds, 500) as $chunk) {
+        foreach (array_chunk($lineUsersByUserId->all(), 500, true) as $chunk) {
             try {
-                if ($lineBot->multicast($chunk, $messages)) {
-                    $sentCount += count($chunk);
+                if ($lineBot->multicast(array_values($chunk), $messages)) {
+                    array_push($sentUserIds, ...array_keys($chunk));
                 }
             } catch (\Throwable $e) {
                 Log::error('SendVisitScenarioBatch: multicast failed', [
@@ -97,11 +97,21 @@ class SendVisitScenarioBatch extends Command
             }
         }
 
-        DB::table('visit_scenario_sends')
-            ->whereIn('id', $sends->pluck('id')->all())
-            ->update(['sent_at' => now(), 'updated_at' => now()]);
+        if (!empty($sentUserIds)) {
+            DB::table('visit_scenario_sends')
+                ->whereIn('id', $sends->whereIn('user_id', $sentUserIds)->pluck('id')->all())
+                ->update(['sent_at' => now(), 'updated_at' => now()]);
+        }
 
-        $this->info("Scenario #{$scenarioId}: multicast to {$sentCount} users ({$sends->count()} sends)");
+        $failedCount = $sends->whereNotIn('user_id', $sentUserIds)->count();
+        if ($failedCount > 0) {
+            Log::warning('SendVisitScenarioBatch: some sends were not marked as sent', [
+                'scenario_id' => $scenarioId,
+                'failed_count' => $failedCount,
+            ]);
+        }
+
+        $this->info("Scenario #{$scenarioId}: multicast to " . count($sentUserIds) . " users ({$sends->count()} sends)");
     }
 
     // ─────────────────────────────────────────────────────────────
