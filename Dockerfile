@@ -1,4 +1,4 @@
-FROM php:8.4-cli
+FROM php:8.4.27-cli
 
 # 必要な拡張 + Node.js 22 + SQLite
 RUN apt-get update && apt-get install -y \
