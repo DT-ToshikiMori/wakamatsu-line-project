@@ -29,6 +29,7 @@ class StoreDashboard extends Page
     public array $frequencyRows = [];
     public array $postalRows = [];
     public array $mapRows = [];
+    public ?array $selectedStore = null;
     public ?string $googleMapsApiKey = null;
 
     public function mount(): void
@@ -67,7 +68,11 @@ class StoreDashboard extends Page
         [$start, $end] = $this->period();
 
         $this->summary = $this->buildSummary($start, $end);
-        $this->storeRows = $this->buildStoreRows($start, $end);
+        $this->storeRows = $this->storeId ? [] : $this->buildStoreRows($start, $end);
+        $this->selectedStore = $this->storeId
+            ? Store::query()->where('is_active', true)->whereKey($this->storeId)
+                ->first(['id', 'name', 'address'])?->toArray()
+            : null;
 
         $visitorUserIds = $this->visitorUserIds($start, $end);
 
@@ -126,14 +131,12 @@ class StoreDashboard extends Page
 
     protected function repeatVisitorCount(Carbon $start, Carbon $end): int
     {
-        return DB::table('visits as v')
-            ->whereBetween('v.visited_at', [$start, $end])
-            ->when($this->storeId, fn ($query) => $query->where('v.store_id', $this->storeId))
+        $repeatVisitors = $this->visitsQuery($start, $end)
             ->groupBy('v.user_id')
             ->havingRaw('COUNT(*) >= 2')
-            ->select('v.user_id')
-            ->get()
-            ->count();
+            ->select('v.user_id');
+
+        return DB::query()->fromSub($repeatVisitors, 'repeat_visitors')->count();
     }
 
     protected function newVisitorCount(Carbon $start, Carbon $end): int

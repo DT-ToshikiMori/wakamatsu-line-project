@@ -32,9 +32,9 @@
                 ['label' => '来店回数', 'value' => number_format($summary['visit_count'] ?? 0), 'unit' => '回'],
                 ['label' => '来店ユーザー数', 'value' => number_format($summary['visitor_count'] ?? 0), 'unit' => '人'],
                 ['label' => '新規来店ユーザー', 'value' => number_format($summary['new_visitor_count'] ?? 0), 'unit' => '人'],
-                ['label' => '期間内リピート', 'value' => number_format($summary['repeat_visitor_count'] ?? 0), 'unit' => '人'],
+                ['label' => '期間内に2回以上来店', 'value' => number_format($summary['repeat_visitor_count'] ?? 0), 'unit' => '人'],
                 ['label' => '平均来店回数', 'value' => number_format($summary['avg_visits_per_user'] ?? 0, 2), 'unit' => '回/人'],
-                ['label' => 'リピート率', 'value' => number_format($summary['repeat_rate'] ?? 0, 1), 'unit' => '%'],
+                ['label' => '期間内の複数回来店率', 'value' => number_format($summary['repeat_rate'] ?? 0, 1), 'unit' => '%'],
             ];
         @endphp
 
@@ -49,6 +49,11 @@
         @endforeach
     </div>
 
+    <p class="text-xs text-gray-500 dark:text-gray-400">
+        「新規」は選択店舗への初回来店、「複数回来店率」は期間内に2回以上来店した人数 ÷ 来店ユーザー数です。
+        全店舗選択時は店舗をまたいで集計します。一般的な再来店率とは異なります。
+    </p>
+
     @if(empty($storeId))
         <x-filament::section>
             <x-slot name="heading">店舗別サマリー</x-slot>
@@ -61,7 +66,7 @@
                             <th class="py-2 px-4 font-medium text-right">来店回数</th>
                             <th class="py-2 px-4 font-medium text-right">来店ユーザー数</th>
                             <th class="py-2 px-4 font-medium text-right">新規来店ユーザー</th>
-                            <th class="py-2 pl-4 font-medium text-right">期間内リピート</th>
+                            <th class="py-2 pl-4 font-medium text-right">期間内に2回以上来店</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100 dark:divide-white/10">
@@ -101,8 +106,9 @@
             ])
         </x-filament::section>
 
-        <x-filament::section>
-            <x-slot name="heading">初回登録時の来店状況</x-slot>
+        <x-filament::section collapsible collapsed>
+            <x-slot name="heading">初回登録時の来店状況（自己申告）</x-slot>
+            <p class="mb-3 text-xs text-gray-500">登録時の回答であり、現在の来店回数ではありません。</p>
             @include('filament.pages.partials.store-pie-breakdown', [
                 'rows' => $frequencyRows,
                 'colors' => ['#22c55e', '#f59e0b', '#ef4444', '#6b7280'],
@@ -110,136 +116,28 @@
         </x-filament::section>
 
         <x-filament::section>
-            <x-slot name="heading">郵便番号エリアマップ</x-slot>
+            <x-slot name="heading">郵便番号エリアマップ（上位20件）</x-slot>
+            <p class="mb-3 text-xs text-gray-500">オレンジ色は来店者の郵便番号エリア、青い「店」は選択店舗です。割合の分母は期間内の来店ユーザー全員（郵便番号未登録を含む）です。</p>
             @if(empty($googleMapsApiKey))
                 <div class="py-8 text-center text-sm text-gray-500">Google Maps APIキーが未設定です</div>
-            @elseif(empty($mapRows))
+            @elseif(empty($mapRows) && empty($selectedStore['address']))
                 <div class="py-8 text-center text-sm text-gray-500">地図に表示できる郵便番号データがありません</div>
+                @if($selectedStore)
+                    <p class="text-sm text-gray-500">店舗住所が未登録のため、店舗ピンを表示できません。</p>
+                @endif
             @else
-                <div
-                    id="store-postal-map"
-                    data-api-key="{{ $googleMapsApiKey }}"
-                    data-map-rows='@json($mapRows)'
-                    style="height:420px; border-radius:8px; overflow:hidden; background:#111827;"
-                ></div>
-
-                @once
-                    <script>
-                    (() => {
-                        if (window.wakamatsuStorePostalMapInitialized) {
-                            return;
-                        }
-
-                        window.wakamatsuStorePostalMapInitialized = true;
-
-                        window.wakamatsuLoadGoogleMaps = (apiKey) => {
-                            if (window.google?.maps) {
-                                return Promise.resolve();
-                            }
-
-                            window.wakamatsuGoogleMapsPromise = window.wakamatsuGoogleMapsPromise || new Promise((resolve, reject) => {
-                                window.wakamatsuGoogleMapsLoaded = resolve;
-
-                                const existing = document.querySelector('script[data-wakamatsu-google-maps]');
-                                if (existing) {
-                                    existing.addEventListener('error', reject, { once: true });
-                                    return;
-                                }
-
-                                const script = document.createElement('script');
-                                script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(apiKey)}&callback=wakamatsuGoogleMapsLoaded`;
-                                script.async = true;
-                                script.defer = true;
-                                script.dataset.wakamatsuGoogleMaps = 'true';
-                                script.onerror = reject;
-                                document.head.appendChild(script);
-                            });
-
-                            return window.wakamatsuGoogleMapsPromise;
-                        };
-
-                        const parseRows = (element) => {
-                            try {
-                                return JSON.parse(element.dataset.mapRows || '[]');
-                            } catch (error) {
-                                return [];
-                            }
-                        };
-
-                        window.wakamatsuRenderStorePostalMap = () => {
-                            const element = document.getElementById('store-postal-map');
-                            if (!element) {
-                                return;
-                            }
-
-                            const rows = parseRows(element);
-                            if (rows.length === 0) {
-                                return;
-                            }
-
-                            window.wakamatsuLoadGoogleMaps(element.dataset.apiKey)
-                                .then(() => {
-                                    const bounds = new google.maps.LatLngBounds();
-                                    const map = new google.maps.Map(element, {
-                                        center: { lat: rows[0].lat, lng: rows[0].lng },
-                                        zoom: 12,
-                                        mapTypeControl: false,
-                                        streetViewControl: false,
-                                        fullscreenControl: true,
-                                    });
-                                    const infoWindow = new google.maps.InfoWindow();
-
-                                    rows.forEach((row) => {
-                                        const position = { lat: Number(row.lat), lng: Number(row.lng) };
-                                        bounds.extend(position);
-
-                                        const circle = new google.maps.Circle({
-                                            strokeColor: '#f97316',
-                                            strokeOpacity: 0.85,
-                                            strokeWeight: 1,
-                                            fillColor: '#f97316',
-                                            fillOpacity: Number(row.opacity || 0.35),
-                                            map,
-                                            center: position,
-                                            radius: Number(row.radius || 600),
-                                        });
-
-                                        circle.addListener('click', () => {
-                                            infoWindow.setPosition(position);
-                                            infoWindow.setContent(`
-                                                <div style="font-size:13px; line-height:1.7; color:#111827; min-width:150px;">
-                                                    <strong style="color:#111827;">〒${row.postal_code}</strong><br>
-                                                    <span style="color:#111827;">${Number(row.count || 0).toLocaleString()}人 / ${row.percent}%</span><br>
-                                                    <span style="color:#4b5563;">${row.address || ''}</span>
-                                                </div>
-                                            `);
-                                            infoWindow.open(map);
-                                        });
-                                    });
-
-                                    if (rows.length > 1) {
-                                        map.fitBounds(bounds, 48);
-                                    }
-                                })
-                                .catch(() => {});
-                        };
-
-                        document.addEventListener('DOMContentLoaded', window.wakamatsuRenderStorePostalMap);
-                        document.addEventListener('livewire:navigated', window.wakamatsuRenderStorePostalMap);
-                        document.addEventListener('livewire:init', () => {
-                            if (!window.Livewire) {
-                                return;
-                            }
-
-                            window.Livewire.hook('morph.updated', () => {
-                                window.wakamatsuRenderStorePostalMap();
-                            });
-                        });
-                        window.wakamatsuRenderStorePostalMap();
-                    })();
-                    </script>
-                @endonce
+                <div data-store-postal-map
+                     data-api-key="{{ $googleMapsApiKey }}"
+                     data-map-rows='@json($mapRows)'
+                     data-selected-store='@json($selectedStore)'>
+                    <p data-map-status role="status" aria-live="polite" class="mb-2 text-xs text-gray-500"></p>
+                    <div id="store-postal-map" wire:ignore
+                         style="height:420px; border-radius:8px; overflow:hidden; background:#f3f4f6;"></div>
+                </div>
             @endif
+            @once
+                <script src="{{ asset('js/store-postal-map.js') }}?v={{ filemtime(public_path('js/store-postal-map.js')) }}" defer></script>
+            @endonce
         </x-filament::section>
 
         <x-filament::section>
