@@ -9,9 +9,12 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class SendVisitScenarioBatch extends Command
 {
+    private ?string $deliveryToken = null;
+
     protected $signature = 'visit-scenario:send';
     protected $description = '来店シナリオの通知をバッチ送信（5分毎実行）';
 
@@ -45,6 +48,8 @@ class SendVisitScenarioBatch extends Command
             Log::warning('SendVisitScenarioBatch: scenario not found', ['scenario_id' => $scenarioId]);
             return;
         }
+
+        $this->deliveryToken = (string) Str::uuid();
 
         // ── バブルがあればバブルベース、なければ旧来のcoupon_template直接方式 ──
         $bubbles = DB::table('message_bubbles')
@@ -100,7 +105,7 @@ class SendVisitScenarioBatch extends Command
         if (!empty($sentUserIds)) {
             DB::table('visit_scenario_sends')
                 ->whereIn('id', $sends->whereIn('user_id', $sentUserIds)->pluck('id')->all())
-                ->update(['sent_at' => now(), 'updated_at' => now()]);
+                ->update(['sent_at' => now(), 'delivery_token' => $this->deliveryToken, 'updated_at' => now()]);
         }
 
         $failedCount = $sends->whereNotIn('user_id', $sentUserIds)->count();
@@ -140,7 +145,7 @@ class SendVisitScenarioBatch extends Command
 
                 $imageUrl    = CouponTemplate::resolveImageUrl($tpl->image_url);
                 $expiresText = $bubble->coupon_expires_days
-                    ? "取得から{$bubble->coupon_expires_days}日間有効"
+                    ? (in_array($scenarioId, [3, 4], true) ? "配信から60日間有効" : "取得から{$bubble->coupon_expires_days}日間有効")
                     : null;
 
                 $messages[] = [
@@ -190,7 +195,7 @@ class SendVisitScenarioBatch extends Command
 
         $liffUrl     = $this->buildLiffUrl($scenarioId);
         $imageUrl    = CouponTemplate::resolveImageUrl($tpl->image_url);
-        $expiresText = $scenario->expires_days ? "取得から{$scenario->expires_days}日間有効" : null;
+        $expiresText = $scenario->expires_days ? (in_array($scenarioId, [3, 4], true) ? "配信から60日間有効" : "取得から{$scenario->expires_days}日間有効") : null;
 
         return [[
             'type'     => 'flex',
@@ -202,7 +207,7 @@ class SendVisitScenarioBatch extends Command
     private function buildLiffUrl(int $scenarioId): string
     {
         $liffId = config('services.line.liff_id');
-        return "https://liff.line.me/{$liffId}/coupons?scenario_id={$scenarioId}&ts=" . now()->timestamp;
+        return "https://liff.line.me/{$liffId}/coupons?scenario_id={$scenarioId}&ts=" . now()->timestamp . ($this->deliveryToken ? "&delivery={$this->deliveryToken}" : '');
     }
 
     // ─────────────────────────────────────────────────────────────

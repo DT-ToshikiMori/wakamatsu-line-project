@@ -27,7 +27,10 @@ class CouponController extends Controller
         // 来店シナリオ経由: scenario_id があればクーポン自動発行
         $scenarioId = (int) $req->query('scenario_id', 0);
         if ($scenarioId) {
-            $this->claimScenarioCoupon($user, $scenarioId);
+            $expired = $this->claimScenarioCoupon($user, $scenarioId, $req->query('delivery'));
+            if ($expired) {
+                return response()->view('coupons.scenario-expired', ['storeId' => (int) $req->query('store', 0)]);
+            }
         }
 
         $coupons = DB::table('user_coupons as uc')
@@ -270,27 +273,29 @@ class CouponController extends Controller
     /**
      * 来店シナリオ経由のクーポン発行（LIFF遷移時に自動発行）
      */
-    private function claimScenarioCoupon(object $user, int $scenarioId): void
+    private function claimScenarioCoupon(object $user, int $scenarioId, ?string $delivery = null): bool
     {
-        DB::transaction(function () use ($user, $scenarioId): void {
-            $this->claimScenarioCouponInTransaction($user, $scenarioId);
+        return DB::transaction(function () use ($user, $scenarioId, $delivery): bool {
+            return $this->claimScenarioCouponInTransaction($user, $scenarioId, $delivery);
         });
     }
 
-    private function claimScenarioCouponInTransaction(object $user, int $scenarioId): void
+    private function claimScenarioCouponInTransaction(object $user, int $scenarioId, ?string $delivery = null): bool
     {
-        // 未発行の送信レコードを確認（二重発行防止: coupon_issued_at IS NULL）
+        // 配信を特定してロック。取得済みなら再発行せず一覧へ戻す。
         $send = DB::table('visit_scenario_sends')
             ->where('user_id', $user->id)
             ->where('scenario_id', $scenarioId)
             ->whereNotNull('sent_at')
-            ->whereNull('coupon_issued_at')
+            ->when($delivery !== null, fn ($query) => $query->where('delivery_token', $delivery))
+            ->when($delivery === null && in_array($scenarioId, [3, 4], true), fn ($query) => $query->whereNull('delivery_token'))
+            ->when(!in_array($scenarioId, [3, 4], true), fn ($query) => $query->whereNull('coupon_issued_at'))
             ->orderByDesc('id')
             ->lockForUpdate()
             ->first();
 
-        if (!$send) {
-            return;
+        if (!$send || $send->coupon_issued_at !== null) {
+            return false;
         }
 
         $scenario = DB::table('visit_scenarios')
@@ -298,7 +303,7 @@ class CouponController extends Controller
             ->first();
 
         if (!$scenario) {
-            return;
+            return false;
         }
 
         // 新方式: message_bubbles のクーポン設定を優先。旧方式は scenario の coupon_template_id を使う。
@@ -315,7 +320,7 @@ class CouponController extends Controller
 
         $tplId = $bubble?->coupon_template_id ?? $scenario->coupon_template_id;
         if (!$tplId) {
-            return;
+            return false;
         }
 
         $tpl = DB::table('coupon_templates')
@@ -324,11 +329,17 @@ class CouponController extends Controller
             ->first();
 
         if (!$tpl) {
-            return;
+            return false;
         }
 
         $now = now();
-        $expiresAt = $this->calculateScenarioCouponExpiresAt($scenario, $bubble, $now);
+        $expiresAt = in_array($scenarioId, [3, 4], true)
+            ? Carbon::parse($send->sent_at)->addDays(60)
+            : $this->calculateScenarioCouponExpiresAt($scenario, $bubble, $now);
+
+        if ($expiresAt && $now->greaterThanOrEqualTo($expiresAt)) {
+            return true;
+        }
 
         // 来店シナリオは同じバブルを繰り返し送る可能性があるため、
         // user_coupons.message_bubble_id の一意制約ではなく visit_scenario_sends.user_coupon_id で送信単位に紐づける。
@@ -353,6 +364,8 @@ class CouponController extends Controller
         ]);
 
         $this->markScenarioCouponIssued($send->id, $scenario, $userCouponId, $now, $expiresAt, $now);
+
+        return false;
     }
 
     private function markScenarioCouponIssued(
